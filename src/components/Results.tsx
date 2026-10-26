@@ -23,7 +23,8 @@ export default function Results({ result: r, newUnlock, onAgain, onMenu, onBoard
       setTimeout(() => setCopied(false), 1800);
     }
   };
-  const medal = r.position === 1 ? '🥇' : r.position === 2 ? '🥈' : r.position === 3 ? '🥉' : '🏁';
+  const trial = r.mode === 'trial';
+  const medal = trial ? '⏱️' : r.position === 1 ? '🥇' : r.position === 2 ? '🥈' : r.position === 3 ? '🥉' : '🏁';
   const winTime = r.standings[0]?.time ?? 0;
 
   return (
@@ -31,7 +32,7 @@ export default function Results({ result: r, newUnlock, onAgain, onMenu, onBoard
       <div className="glass animate-rise w-full max-w-md p-5 !bg-[rgba(16,22,38,0.82)]">
         <div className="text-center">
           <div className="text-5xl">{medal}</div>
-          <h2 className="title-grad mt-1 text-4xl font-extrabold tracking-tight">{ordinal(r.position)} place</h2>
+          <h2 className="title-grad mt-1 text-4xl font-extrabold tracking-tight">{trial ? 'Time Trial' : `${ordinal(r.position)} place`}</h2>
           <p className="mt-1 text-sm text-white/60">
             {w.emoji} {w.name} · Seed {r.seed}
           </p>
@@ -48,6 +49,18 @@ export default function Results({ result: r, newUnlock, onAgain, onMenu, onBoard
           </div>
         </div>
 
+        {trial && (
+          <ol className="mt-3 space-y-1">
+            {r.lapTimes.map((t, i) => (
+              <li key={i} className={`flex items-center justify-between rounded-xl px-3 py-1.5 text-sm ${t === r.bestLap ? 'bg-apple-pink/25 font-semibold' : 'bg-white/[0.04]'}`}>
+                <span>Lap {i + 1}</span>
+                <span className="font-mono text-xs">{formatTime(t)}</span>
+              </li>
+            ))}
+          </ol>
+        )}
+
+        {!trial && (
         <ol className="mt-3 space-y-1">
           {r.standings.map((s, i) => (
             <li key={s.name} className={`flex items-center gap-3 rounded-xl px-3 py-1.5 text-sm ${s.you ? 'bg-apple-blue/30 font-semibold' : 'bg-white/[0.04]'}`}>
@@ -58,6 +71,7 @@ export default function Results({ result: r, newUnlock, onAgain, onMenu, onBoard
             </li>
           ))}
         </ol>
+        )}
 
         {newUnlock && (
           <p className="mt-3 rounded-2xl bg-apple-green/15 px-4 py-2.5 text-center text-sm font-medium text-apple-green">

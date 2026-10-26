@@ -298,6 +298,8 @@ export interface KartFx {
   flicker: number;
   fall: number; // 0..1 falling progress
   blink: boolean;
+  spin?: number; // 0..1 progress of a spin-out
+  shield?: boolean;
 }
 
 export function drawKart(ctx: Ctx, cx: number, base: number, w: number, color: string, accent: string, fx: KartFx, clipY = 0) {
@@ -315,7 +317,7 @@ export function drawKart(ctx: Ctx, cx: number, base: number, w: number, color: s
   const fallScale = 1 - fx.fall * 0.85;
   ctx.translate(cx, base + fx.fall * w * 1.2);
   ctx.scale(fallScale, fallScale);
-  ctx.rotate(fx.tilt * 0.06 + fx.drift * 0.28 + fx.fall * 1.2);
+  ctx.rotate(fx.tilt * 0.06 + fx.drift * 0.28 + fx.fall * 1.2 + (fx.spin ?? 0) * Math.PI * 2);
 
   // rear wheels
   ctx.fillStyle = '#0d0f16';
@@ -359,6 +361,16 @@ export function drawKart(ctx: Ctx, cx: number, base: number, w: number, color: s
   ctx.fillRect(w * 0.1, -w * 0.3, w * 0.2, w * 0.05);
   glowDot(ctx, -w * 0.2, -w * 0.28, w * 0.18, '#ff2d55', 0.7);
   glowDot(ctx, w * 0.2, -w * 0.28, w * 0.18, '#ff2d55', 0.7);
+  if (fx.shield) {
+    const sg = ctx.createRadialGradient(0, -w * 0.35, w * 0.2, 0, -w * 0.35, w * 0.8);
+    sg.addColorStop(0, 'rgba(90,200,250,0.05)');
+    sg.addColorStop(0.8, 'rgba(90,200,250,0.35)');
+    sg.addColorStop(1, 'rgba(180,240,255,0.8)');
+    ctx.fillStyle = sg;
+    ctx.beginPath();
+    ctx.ellipse(0, -w * 0.35, w * 0.8, w * 0.7, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
   // exhaust flames
   if (fx.boost) {
     const f = 0.8 + fx.flicker * 0.5;
@@ -381,4 +393,80 @@ export function drawKart(ctx: Ctx, cx: number, base: number, w: number, color: s
 // ---------- road overlays ----------
 export function lerp(a: number, b: number, p: number): number {
   return a + (b - a) * p;
+}
+
+// ---------- item boxes, oil slicks, missiles ----------
+export function drawItemBox(ctx: Ctx, cx: number, base: number, u: number, time: number, phase: number, clipY: number) {
+  const s = 650 * u;
+  if (s < 3) return;
+  const y = base - 650 * u - Math.sin(time * 3 + phase) * s * 0.08;
+  ctx.save();
+  clipAbove(ctx, clipY);
+  glowDot(ctx, cx, y, s * 1.3, '#ffd60a', 0.55);
+  ctx.translate(cx, y);
+  ctx.rotate(time * 1.4 + phase);
+  const g = ctx.createLinearGradient(-s / 2, -s / 2, s / 2, s / 2);
+  g.addColorStop(0, '#ff2d55');
+  g.addColorStop(1, '#ffd60a');
+  ctx.fillStyle = g;
+  ctx.globalAlpha = 0.85;
+  ctx.fillRect(-s / 2, -s / 2, s, s);
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = Math.max(1, s * 0.05);
+  ctx.strokeRect(-s / 2, -s / 2, s, s);
+  ctx.rotate(-(time * 1.4 + phase));
+  if (s > 12) {
+    ctx.fillStyle = '#fff';
+    ctx.font = `800 ${Math.round(s * 0.7)}px -apple-system, system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('?', 0, s * 0.04);
+  }
+  ctx.restore();
+}
+
+export function drawProp(ctx: Ctx, kind: 'oil' | 'missile', cx: number, base: number, u: number, time: number, clipY: number) {
+  ctx.save();
+  clipAbove(ctx, clipY);
+  if (kind === 'oil') {
+    const w = 1000 * u;
+    const g = ctx.createRadialGradient(cx, base, 0, cx, base, w / 2);
+    g.addColorStop(0, 'rgba(5,5,15,0.95)');
+    g.addColorStop(0.7, 'rgba(15,10,40,0.9)');
+    g.addColorStop(1, 'rgba(15,10,40,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(cx, base, w / 2, w * 0.14, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 0.35;
+    ctx.fillStyle = `hsl(${(time * 120) % 360},90%,60%)`;
+    ctx.beginPath();
+    ctx.ellipse(cx - w * 0.1, base - w * 0.02, w * 0.18, w * 0.04, 0, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    const s = 420 * u;
+    const y = base - 320 * u;
+    glowDot(ctx, cx, y, s * 2.4, '#ff6a00', 0.8);
+    ctx.fillStyle = '#f2f2f7';
+    ctx.beginPath();
+    ctx.ellipse(cx, y, s * 0.35, s * 0.55, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#ff2d55';
+    ctx.beginPath();
+    ctx.moveTo(cx - s * 0.35, y + s * 0.3);
+    ctx.lineTo(cx - s * 0.7, y + s * 0.7);
+    ctx.lineTo(cx - s * 0.2, y + s * 0.5);
+    ctx.moveTo(cx + s * 0.35, y + s * 0.3);
+    ctx.lineTo(cx + s * 0.7, y + s * 0.7);
+    ctx.lineTo(cx + s * 0.2, y + s * 0.5);
+    ctx.fill();
+    ctx.fillStyle = '#ffd60a';
+    ctx.beginPath();
+    ctx.moveTo(cx - s * 0.2, y + s * 0.5);
+    ctx.lineTo(cx + s * 0.2, y + s * 0.5);
+    ctx.lineTo(cx, y + s * (0.9 + 0.3 * Math.sin(time * 40)));
+    ctx.fill();
+  }
+  ctx.restore();
 }

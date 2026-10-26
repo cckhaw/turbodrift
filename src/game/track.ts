@@ -28,6 +28,7 @@ export function generateTrack(worldId: number, seed: number): Track {
       fog: 0,
       clip: 0,
       cars: [],
+      props: [],
     });
   };
 
@@ -102,6 +103,13 @@ export function generateTrack(worldId: number, seed: number): Track {
       segs[i].hazard = hz;
       i += rng.int(70, 150);
     }
+  }
+
+  // item boxes (placed last so earlier rng draws, and therefore existing tracks, are unchanged)
+  i = 130;
+  while (i < N - 100) {
+    segs[i].boxes = [-0.55, 0, 0.55];
+    i += rng.int(200, 300);
   }
 
   // racing line: lean toward the inside of upcoming curves, smoothed

@@ -4,7 +4,9 @@ import { haptic } from '../utils/haptics';
 import { GHOST_DT, ghostAt, loadGhost, saveGhost, type Ghost } from '../utils/ghost';
 import { BOT_COLORS, BOT_NAMES, LAPS, SEG_LENGTH, WORLDS } from './worlds';
 import { generateTrack } from './track';
-import { drawBackdrop, drawHazard, drawKart, drawScenery, lerp, makeBackdrop, mix, type Backdrop } from './draw';
+import { KARTS, kartById, type KartSpec } from './karts';
+import { BOX_OFFSETS, BOX_RESPAWN, OIL_LIFE, SHIELD_TIME, SPIN_TIME, rollItem } from './items';
+import { drawBackdrop, drawHazard, drawItemBox, drawKart, drawProp, drawScenery, lerp, makeBackdrop, mix, type Backdrop } from './draw';
 import type { Car, HudSnapshot, RaceResult, Segment, Track, WorldConfig } from './types';
 
 const FOV = 80;
@@ -45,6 +47,8 @@ export interface EngineOptions {
   seed: number;
   onHud: (h: HudSnapshot) => void;
   onFinish: (r: RaceResult) => void;
+  mode?: 'race' | 'trial';
+  kart?: string;
 }
 
 export class Engine {
@@ -93,7 +97,17 @@ export class Engine {
   private playerLap = 1;
   private visTilt = 0;
   private visDrift = 0;
+  private visSpin = 0;
   private resizeObs?: ResizeObserver;
+
+  // karts, items, hazards thrown by cars
+  private kart: KartSpec;
+  private mode: 'race' | 'trial';
+  private itemRng: Rng;
+  private itemRollT = 0;
+  private boxTaken = new Map<string, number>();
+  private oils: { dist: number; x: number; life: number; owner: number }[] = [];
+  private missiles: { dist: number; x: number; speed: number; life: number; owner: Car; target: Car | null }[] = [];
 
   constructor(private o: EngineOptions) {
     this.ctx = o.canvas.getContext('2d', { alpha: false })!;
@@ -101,7 +115,10 @@ export class Engine {
     this.track = generateTrack(o.world, o.seed);
     const r = new Rng(hashSeed(o.world, o.seed, 99));
     this.backdrop = makeBackdrop(() => r.next());
-    this.player = this.makeCar(0, 'YOU', '#007AFF', '#5AC8FA', true);
+    this.mode = o.mode ?? 'race';
+    this.kart = kartById(o.kart ?? KARTS[0].id);
+    this.itemRng = new Rng(hashSeed(o.world, o.seed, 555));
+    this.player = this.makeCar(0, 'YOU', this.kart.color, this.kart.accent, true);
     this.setupGrid(r);
     this.ghost = loadGhost(o.world, o.seed);
     if (this.ghost) this.ghostCar = { ...this.makeCar(99, 'BEST', '#ffffff', '#ffffff', false), ghost: true };
@@ -112,10 +129,16 @@ export class Engine {
 
   // ---------- setup ----------
   private makeCar(id: number, name: string, color: string, accent: string, isPlayer: boolean): Car {
-    return { id, name, color, accent, dist: 0, x: 0, speed: 0, isPlayer, skill: 1, lane: 0, wobble: 0, finishTime: null, lap: 1, steerVis: 0 };
+    return { id, name, color, accent, dist: 0, x: 0, speed: 0, isPlayer, skill: 1, lane: 0, wobble: 0, finishTime: null, lap: 1, steerVis: 0, item: null, itemT: 0, shieldT: 0, spinT: 0, boostT: 0 };
   }
 
   private setupGrid(r: Rng) {
+    if (this.mode === 'trial') {
+      this.player.dist = -700;
+      this.player.x = 0;
+      this.cars.push(this.player);
+      return;
+    }
     const slots = 6;
     const playerSlot = 3; // start mid-pack so there is someone to chase and someone to defend from
     const order = [...Array(slots).keys()];
@@ -214,6 +237,7 @@ export class Engine {
     if (this.state === 'racing') this.lapT += dt;
     this.stepPlayer(dt, false);
     this.updateBots(dt, false);
+    this.stepProps(dt);
     this.collisions(dt);
     this.trackLaps();
     this.stepGhost(dt);
@@ -233,11 +257,14 @@ export class Engine {
   private stepPlayer(dt: number, frozen: boolean) {
     const p = this.player;
     const wd = this.wd;
-    const max = wd.maxSpeed;
+    const max = wd.maxSpeed * this.kart.speed;
     const seg = this.seg(p.dist);
+    const prevDist = p.dist;
     this.blinkT = Math.max(0, this.blinkT - dt);
     this.hitCd = Math.max(0, this.hitCd - dt);
     this.shake = Math.max(0, this.shake - dt * 3);
+    p.shieldT = Math.max(0, p.shieldT - dt);
+    this.itemRollT = Math.max(0, this.itemRollT - dt);
 
     if (frozen) {
       p.speed = 0;
@@ -258,11 +285,16 @@ export class Engine {
       return;
     }
 
-    let steer = this.state === 'finished' ? clamp((this.track.line[this.seg(p.dist + 1500).index] - p.x) * 2.5, -1, 1) : this.input.steer;
+    const spun = p.spinT > 0;
+    if (spun) {
+      p.spinT -= dt;
+      if (this.drifting) this.releaseDrift(true);
+    }
+    let steer = spun ? 0 : this.state === 'finished' ? clamp((this.track.line[this.seg(p.dist + 1500).index] - p.x) * 2.5, -1, 1) : this.input.steer;
     const pct = clamp(p.speed / max, 0, 1.5);
 
     // drift state machine
-    const wantDrift = this.input.drift && this.state === 'racing' && pct > 0.35;
+    const wantDrift = this.input.drift && this.state === 'racing' && pct > 0.35 && !spun;
     if (wantDrift && !this.drifting && Math.abs(steer) > 0.25) {
       this.drifting = true;
       this.driftDir = Math.sign(steer);
@@ -272,9 +304,9 @@ export class Engine {
     if (this.drifting && !wantDrift) this.releaseDrift();
     let steerEff = steer;
     let cent = wd.centrifugal;
-    let turnRate = 2;
+    let turnRate = 2 * this.kart.handling;
     if (this.drifting) {
-      this.driftCharge += dt * (0.8 + 0.4 * Math.abs(steer));
+      this.driftCharge += dt * (0.8 + 0.4 * Math.abs(steer)) * this.kart.drift;
       const lvl: 0 | 1 | 2 = this.driftCharge > 2.1 ? 2 : this.driftCharge > 0.9 ? 1 : 0;
       if (lvl > this.driftLvl) {
         synth.driftLevel(lvl);
@@ -283,7 +315,7 @@ export class Engine {
       this.driftLvl = lvl;
       steerEff = this.driftDir * (0.6 + 0.4 * clamp(steer * this.driftDir, -1, 1));
       cent *= 0.38;
-      turnRate = 2.3;
+      turnRate = 2.3 * this.kart.handling;
       this.sparks(dt);
     }
 
@@ -291,9 +323,9 @@ export class Engine {
     const boosting = this.boostT > 0;
     if (boosting) this.boostT -= dt;
     const offroad = Math.abs(p.x) > 1;
-    let target = max * (boosting ? 1.38 : 1) * (this.drifting ? 0.97 : 1);
+    let target = max * (boosting ? 1.38 : 1) * (this.drifting ? 0.97 : 1) * (spun ? 0.35 : 1);
     if (offroad) target = Math.min(target, max * wd.offroadLimit);
-    const accel = max * (boosting ? 1.4 : 0.42);
+    const accel = max * (boosting ? 1.4 : 0.42 * this.kart.accel);
     if (p.speed < target) p.speed = Math.min(target, p.speed + accel * dt);
     else p.speed = Math.max(target, p.speed - max * (offroad ? 1.6 : 0.5) * dt);
     if (this.state === 'finished') p.speed = Math.max(max * 0.5, p.speed - max * 0.2 * dt);
@@ -317,6 +349,8 @@ export class Engine {
       haptic.fall();
     }
 
+    if (this.state === 'racing') this.collectBoxes(p, prevDist);
+
     // pads + hazards on the segment we are in
     if (seg.pad && Math.abs(p.x - seg.pad.offset) < seg.pad.width + 0.1 && this.boostT < 0.9) {
       this.boostT = 1.2;
@@ -339,6 +373,7 @@ export class Engine {
       }
     }
     this.visTilt = lerp(this.visTilt, steerEff, Math.min(1, dt * 8));
+    this.visSpin = spun ? 1 - p.spinT / SPIN_TIME : 0;
     this.visDrift = lerp(this.visDrift, this.drifting ? this.driftDir * (0.5 + 0.3 * steer * this.driftDir) : 0, Math.min(1, dt * 10));
   }
 
@@ -401,6 +436,156 @@ export class Engine {
       this.particles.push({ x: this.W / 2 + (Math.random() - 0.5) * this.W * 0.1, y: this.H * 0.88, vx: (Math.random() - 0.5) * 60, vy: 120 + Math.random() * 120, life: 0, max: 0.3, color: '#5ac8fa', size: 2.5 });
   }
 
+  // ---------- items ----------
+  private wrap(d: number): number {
+    const L = this.track.length;
+    return mod(d + L / 2, L) - L / 2;
+  }
+
+  private collectBoxes(car: Car, from: number) {
+    if (this.mode === 'trial' || car.item || car.finishTime != null) return;
+    const N = this.track.segments.length;
+    for (let i = Math.floor(from / SEG_LENGTH); i <= Math.floor(car.dist / SEG_LENGTH); i++) {
+      const seg = this.track.segments[((i % N) + N) % N];
+      if (!seg.boxes) continue;
+      for (let k = 0; k < seg.boxes.length; k++) {
+        const key = `${seg.index}:${k}`;
+        if ((this.boxTaken.get(key) ?? 0) > this.time || Math.abs(car.x - BOX_OFFSETS[k]) > 0.3) continue;
+        this.boxTaken.set(key, this.time + BOX_RESPAWN);
+        const rank = this.rank().indexOf(car) + 1;
+        car.item = rollItem(this.itemRng, rank, this.cars.length);
+        if (car.isPlayer) {
+          this.itemRollT = 0.9;
+          synth.pickup();
+          haptic.pad();
+        } else {
+          car.itemT = this.itemRng.range(2, 6);
+        }
+        return;
+      }
+    }
+  }
+
+  /** Player taps the item button. */
+  useItem(): void {
+    const p = this.player;
+    if (this.state !== 'racing' || !p.item || this.itemRollT > 0 || this.fallT > 0 || p.spinT > 0) return;
+    this.activate(p);
+  }
+
+  private activate(car: Car) {
+    const item = car.item;
+    if (!item) return;
+    car.item = null;
+    switch (item) {
+      case 'turbo':
+        if (car.isPlayer) {
+          this.boostT = Math.max(this.boostT, 1.6);
+          this.shake = 0.4;
+          this.say('TURBO!');
+          synth.boost(1);
+          haptic.boost();
+        } else car.boostT = 1.6;
+        break;
+      case 'shield':
+        car.shieldT = SHIELD_TIME;
+        if (car.isPlayer) this.say('Shield up');
+        break;
+      case 'oil':
+        this.oils.push({ dist: car.dist - 600, x: car.x, life: OIL_LIFE, owner: car.id });
+        if (car.isPlayer) this.say('Oil dropped');
+        break;
+      case 'missile': {
+        let target: Car | null = null;
+        let best = 14000;
+        for (const o of this.cars) {
+          const d = o.dist - car.dist;
+          if (o !== car && o.finishTime == null && d > 0 && d < best) {
+            best = d;
+            target = o;
+          }
+        }
+        this.missiles.push({ dist: car.dist + 600, x: car.x, speed: this.wd.maxSpeed * 1.7, life: 6, owner: car, target });
+        if (car.isPlayer) {
+          this.say(target ? 'Missile away' : 'Missile fired');
+          synth.shoot();
+        }
+        break;
+      }
+    }
+  }
+
+  private hitCar(car: Car, cause: 'oil' | 'missile') {
+    if (car.finishTime != null) return;
+    if (car.shieldT > 0) {
+      car.shieldT = 0;
+      if (car.isPlayer) {
+        this.say('Shield blocked it!');
+        synth.bump();
+      }
+      return;
+    }
+    if (car.isPlayer) {
+      if (this.fallT > 0 || this.blinkT > 0) return;
+      car.spinT = SPIN_TIME;
+      car.speed *= 0.4;
+      this.boostT = 0;
+      this.shake = 1;
+      this.say(cause === 'missile' ? 'Missile hit!' : 'Slipped on oil!');
+      synth.hit();
+      haptic.hit();
+    } else {
+      car.spinT = SPIN_TIME;
+      car.speed *= 0.4;
+      car.boostT = 0;
+    }
+  }
+
+  private stepProps(dt: number) {
+    for (const o of this.oils) {
+      o.life -= dt;
+      for (const c of this.cars) {
+        if (o.life <= 0) break;
+        if (c.id === o.owner && o.life > OIL_LIFE - 1.5) continue;
+        if (Math.abs(this.wrap(c.dist - o.dist)) < 400 && Math.abs(c.x - o.x) < 0.3) {
+          o.life = 0;
+          this.hitCar(c, 'oil');
+        }
+      }
+    }
+    this.oils = this.oils.filter((o) => o.life > 0);
+    for (const m of this.missiles) {
+      m.life -= dt;
+      m.dist += m.speed * dt;
+      if (m.target) {
+        m.x += clamp(m.target.x - m.x, -3 * dt, 3 * dt);
+        if (this.wrap(m.target.dist - m.dist) < -2500) m.target = null;
+      }
+      for (const c of this.cars) {
+        if (m.life <= 0) break;
+        if (c === m.owner) continue;
+        if (Math.abs(this.wrap(c.dist - m.dist)) < 450 && Math.abs(c.x - m.x) < 0.32) {
+          m.life = 0;
+          this.hitCar(c, 'missile');
+        }
+      }
+    }
+    this.missiles = this.missiles.filter((m) => m.life > 0);
+  }
+
+  private botUseItem(b: Car, dt: number) {
+    if (!b.item) return;
+    b.itemT -= dt;
+    if (b.itemT > 0) return;
+    const ahead = this.cars.some((o) => o !== b && o.dist - b.dist > 0 && o.dist - b.dist < 9000);
+    const behind = this.cars.some((o) => o !== b && b.dist - o.dist > 0 && b.dist - o.dist < 3500);
+    if ((b.item === 'missile' && !ahead) || (b.item === 'oil' && !behind)) {
+      b.itemT = 1;
+      return;
+    }
+    this.activate(b);
+  }
+
   private updateBots(dt: number, frozen: boolean) {
     const wd = this.wd;
     const N = this.track.segments.length;
@@ -412,6 +597,10 @@ export class Engine {
         b.speed = 0;
         continue;
       }
+      b.spinT = Math.max(0, b.spinT - dt);
+      b.boostT = Math.max(0, b.boostT - dt);
+      b.shieldT = Math.max(0, b.shieldT - dt);
+      this.botUseItem(b, dt);
       const idx = this.seg(b.dist).index;
       // waypoint: racing line ahead plus personal lane offset
       const look = this.track.line[(idx + 9) % N];
@@ -433,12 +622,14 @@ export class Engine {
       if (gap > 0) rb = 1 - clamp(gap / 110, 0, 1) * wd.rubberSlow;
       else rb = 1 + clamp(-gap / 60, 0, 1) * wd.rubberFast;
       if (finalLap && Math.abs(gap) < 20) rb += 0.025;
-      const targetSpeed = wd.maxSpeed * b.skill * cornerSlow * rb;
+      const targetSpeed = wd.maxSpeed * b.skill * cornerSlow * rb * (b.spinT > 0 ? 0.35 : 1) * (b.boostT > 0 ? 1.25 : 1);
       if (b.speed < targetSpeed) b.speed = Math.min(targetSpeed, b.speed + wd.maxSpeed * 0.4 * dt);
       else b.speed = Math.max(targetSpeed, b.speed - wd.maxSpeed * 0.5 * dt);
       const lat = 1.7 * clamp(b.speed / wd.maxSpeed, 0.2, 1) * dt;
       b.x += clamp(target - b.x, -lat, lat);
+      const prev = b.dist;
       b.dist += b.speed * dt;
+      this.collectBoxes(b, prev);
       b.lap = clamp(Math.floor(b.dist / this.track.length) + 1, 1, LAPS + 1);
       if (b.finishTime == null && b.dist >= LAPS * this.track.length) b.finishTime = this.raceT * 1000;
     }
@@ -512,6 +703,8 @@ export class Engine {
     const p = this.player;
     const remaining = (c: Car) => Math.max(0, LAPS * this.track.length - c.dist) / Math.max(c.speed, this.wd.maxSpeed * 0.5);
     return {
+      mode: this.mode,
+      kart: this.kart.id,
       world: this.o.world,
       seed: this.o.seed,
       position: ranked.indexOf(p) + 1,
@@ -551,6 +744,9 @@ export class Engine {
       standings: ranked.map((c) => ({ name: c.name, color: c.color, you: c.isPlayer, gap: (leaderDist - c.dist) / 1000 })),
       toast: this.toast,
       fallen: this.fallT > 0,
+      item: p.item,
+      itemRolling: this.itemRollT > 0,
+      shield: p.shieldT > 0,
     });
   }
 
@@ -605,6 +801,14 @@ export class Engine {
     // assign cars to segments
     const drawn = this.ghostCar && this.state === 'racing' ? [...this.cars, this.ghostCar] : this.cars;
     for (const s of drawn) this.seg(s.dist).cars.push(s);
+    const propSegs: Segment[] = [];
+    const putProp = (dist: number, x: number, kind: 'oil' | 'missile') => {
+      const sg = this.seg(dist);
+      sg.props.push({ kind, x, pct: (mod(dist, track.length) % SEG_LENGTH) / SEG_LENGTH });
+      propSegs.push(sg);
+    };
+    for (const o of this.oils) putProp(o.dist, o.x, 'oil');
+    for (const m of this.missiles) putProp(m.dist, m.x, 'missile');
 
     let maxy = H;
     let x = 0;
@@ -696,6 +900,19 @@ export class Engine {
           const cx = a.x + (a.scale * off * roadW * W) / 2;
           drawHazard(c, hzd, cx, a.y, u, roadW, this.time, seg.clip);
         }
+        if (seg.boxes && this.mode === 'race') {
+          for (let k = 0; k < seg.boxes.length; k++) {
+            if ((this.boxTaken.get(`${seg.index}:${k}`) ?? 0) > this.time) continue;
+            const cx = a.x + (a.scale * BOX_OFFSETS[k] * roadW * W) / 2;
+            drawItemBox(c, cx, a.y, u, this.time, k * 2 + seg.index, seg.clip);
+          }
+        }
+        for (const pr of seg.props) {
+          const sc = lerp(seg.p1.screen.scale, seg.p2.screen.scale, pr.pct);
+          const sx = lerp(seg.p1.screen.x, seg.p2.screen.x, pr.pct) + (sc * pr.x * roadW * W) / 2;
+          const sy = lerp(seg.p1.screen.y, seg.p2.screen.y, pr.pct);
+          drawProp(c, pr.kind, sx, sy, (sc * W) / 2, this.time, seg.clip);
+        }
         for (const car of seg.cars) {
           if (car.isPlayer) continue;
           const pct = (mod(car.dist, track.length) % SEG_LENGTH) / SEG_LENGTH;
@@ -703,7 +920,7 @@ export class Engine {
           const sx = lerp(seg.p1.screen.x, seg.p2.screen.x, pct) + (sc * car.x * roadW * W) / 2;
           const sy = lerp(seg.p1.screen.y, seg.p2.screen.y, pct);
           const kw = (sc * KART_W * W) / 2;
-          drawKart(c, sx, sy, kw, car.color, car.accent, { tilt: 0, drift: 0, boost: !car.ghost && car.speed > this.wd.maxSpeed * 1.05, flicker: Math.random(), fall: 0, blink: !!car.ghost }, seg.clip);
+          drawKart(c, sx, sy, kw, car.color, car.accent, { tilt: 0, drift: 0, boost: !car.ghost && (car.boostT > 0 || car.speed > this.wd.maxSpeed * 1.05), flicker: Math.random(), fall: 0, blink: !!car.ghost, spin: car.spinT > 0 ? 1 - car.spinT / SPIN_TIME : 0, shield: car.shieldT > 0 }, seg.clip);
           if (kw > 26 && kw < W * 0.2 && sy < H * 0.8 && !car.ghost) {
             c.font = `600 ${Math.max(9, Math.round(kw * 0.17))}px -apple-system, system-ui, sans-serif`;
             c.textAlign = 'center';
@@ -718,6 +935,7 @@ export class Engine {
       }
     }
     for (const s of drawn) this.seg(s.dist).cars.length = 0;
+    for (const sg of propSegs) sg.props.length = 0;
     // fog layer must not tint sprites; just clear the cars lists above
     this.drawOverlay();
     c.restore();
@@ -738,7 +956,7 @@ export class Engine {
       kw,
       this.player.color,
       accent,
-      { tilt: this.visTilt, drift: this.visDrift, boost: this.boostT > 0, flicker: Math.random(), fall: this.fallT > 0 ? clampFall(this.fallT) : 0, blink: this.blinkT > 0 && Math.floor(this.time * 14) % 2 === 0 },
+      { tilt: this.visTilt, drift: this.visDrift, boost: this.boostT > 0, flicker: Math.random(), fall: this.fallT > 0 ? clampFall(this.fallT) : 0, blink: this.blinkT > 0 && Math.floor(this.time * 14) % 2 === 0, spin: this.visSpin, shield: this.player.shieldT > 0 },
       0,
     );
     // particles in screen space

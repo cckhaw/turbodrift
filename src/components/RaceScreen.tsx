@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Pause, Play, Flag, Zap } from 'lucide-react';
 import { Engine } from '../game/engine';
+import { ITEM_INFO } from '../game/items';
+import type { Mode } from '../game/karts';
 import { WORLDS } from '../game/worlds';
 import type { HudSnapshot, RaceResult } from '../game/types';
 import { formatTime } from '../utils/format';
@@ -8,6 +10,8 @@ import { formatTime } from '../utils/format';
 interface Props {
   world: number;
   seed: number;
+  mode: Mode;
+  kart: string;
   onFinish: (r: RaceResult) => void;
   onQuit: () => void;
 }
@@ -15,7 +19,7 @@ interface Props {
 const STEER_RANGE = 70; // px of thumb travel for full lock
 const LVL_COLOR = ['#ffffff', '#5AC8FA', '#FF2D55'];
 
-export default function RaceScreen({ world, seed, onFinish, onQuit }: Props) {
+export default function RaceScreen({ world, seed, mode, kart, onFinish, onQuit }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<Engine | null>(null);
   const finishRef = useRef(onFinish);
@@ -28,7 +32,7 @@ export default function RaceScreen({ world, seed, onFinish, onQuit }: Props) {
   const w = WORLDS[world - 1];
 
   useEffect(() => {
-    const engine = new Engine({ canvas: canvasRef.current!, world, seed, onHud: setHud, onFinish: (r) => finishRef.current(r) });
+    const engine = new Engine({ canvas: canvasRef.current!, world, seed, onHud: setHud, onFinish: (r) => finishRef.current(r), mode, kart });
     engineRef.current = engine;
     engine.start();
     const keys = new Set<string>();
@@ -45,7 +49,8 @@ export default function RaceScreen({ world, seed, onFinish, onQuit }: Props) {
     };
     const down = (e: KeyboardEvent) => {
       if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') setPaused((p) => !p);
-      if (e.key === ' ') e.preventDefault();
+      if (e.key === ' ' || e.key === 'ArrowUp') e.preventDefault();
+      if ((e.key === 'e' || e.key === 'E' || e.key === 'Enter' || e.key === 'ArrowUp') && !e.repeat) engine.useItem();
       keys.add(e.key);
       sync();
     };
@@ -64,7 +69,7 @@ export default function RaceScreen({ world, seed, onFinish, onQuit }: Props) {
       engine.destroy();
       engineRef.current = null;
     };
-  }, [world, seed]);
+  }, [world, seed, mode, kart]);
 
   useEffect(() => {
     engineRef.current?.setPaused(paused);
@@ -133,7 +138,7 @@ export default function RaceScreen({ world, seed, onFinish, onQuit }: Props) {
         </button>
       </div>
 
-      {hud && (
+      {hud && hud.total > 1 && (
         <ul className="pointer-events-none absolute left-3 top-[calc(env(safe-area-inset-top)+84px)] z-20 space-y-1">
           {hud.standings.map((s, i) => (
             <li key={s.name} className={`flex items-center gap-1.5 rounded-pill px-2 py-0.5 text-[11px] font-medium backdrop-blur-md ${s.you ? 'bg-apple-blue/70' : 'bg-black/30 text-white/80'}`}>
@@ -168,11 +173,23 @@ export default function RaceScreen({ world, seed, onFinish, onQuit }: Props) {
           <p className="text-[10px] font-semibold uppercase tracking-widest text-white/50">km/h</p>
         </div>
 
-        <div className="mb-3 h-2 w-28 rounded-pill bg-white/10">
+        <div className="absolute bottom-[calc(env(safe-area-inset-bottom)+34px)] left-[120px] h-2 w-16 rounded-pill bg-white/10">
           <div className="relative h-full">
             <span className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/80" style={{ left: `${50 + steerUi * 45}%` }} />
           </div>
         </div>
+
+        <button
+          aria-label={hud?.item ? `Use ${ITEM_INFO[hud.item].label}` : 'No item'}
+          disabled={mode === 'trial'}
+          className={`pointer-events-auto absolute bottom-[calc(env(safe-area-inset-bottom)+34px)] right-[118px] z-30 flex h-[64px] w-[64px] touch-none select-none items-center justify-center rounded-full border text-3xl backdrop-blur-glass transition active:scale-90 ${mode === 'trial' ? 'hidden' : hud?.item && !hud.itemRolling ? 'border-apple-yellow bg-apple-yellow/25 shadow-[0_0_24px_rgba(255,214,10,0.5)]' : 'border-glass-border bg-glass'}`}
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            engineRef.current?.useItem();
+          }}
+        >
+          {hud?.itemRolling ? <span className="animate-pulse">❓</span> : hud?.item ? ITEM_INFO[hud.item].emoji : <span className="text-base text-white/35">ITEM</span>}
+        </button>
 
         <button
           aria-label="Drift and boost"
@@ -209,7 +226,7 @@ export default function RaceScreen({ world, seed, onFinish, onQuit }: Props) {
             <button onClick={onQuit} className="btn-glass w-full">
               Quit to menu
             </button>
-            <p className="pt-1 text-xs text-white/45">Drag to steer · hold DRIFT in a turn, release to boost</p>
+            <p className="pt-1 text-xs text-white/45">Drag to steer · hold DRIFT in a turn, release to boost · tap the item button (or E) to use pick-ups</p>
           </div>
         </div>
       )}

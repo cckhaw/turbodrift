@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { generateTrack } from '../src/game/track';
 import { SEG_LENGTH, WORLDS } from '../src/game/worlds';
 import { MIN_LAP_MS } from '../api/_core';
+import { MAX_KART_SPEED } from '../src/game/karts';
 
 describe('generateTrack', () => {
   it('rebuilds the identical track from world + seed (shareable challenge links)', () => {
@@ -32,11 +33,18 @@ describe('generateTrack', () => {
     });
 
     it(`world ${w.id}: API lap-time floor is below what the game physics can reach`, () => {
-      const fastest = ((w.lapSegments * SEG_LENGTH) / (w.maxSpeed * 1.38)) * 1000; // permanent boost, no corners
+      const fastest = ((w.lapSegments * SEG_LENGTH) / (w.maxSpeed * MAX_KART_SPEED * 1.38)) * 1000; // fastest kart, permanent boost, no corners
       expect(MIN_LAP_MS[w.id]).toBeLessThan(fastest);
       expect(MIN_LAP_MS[w.id]).toBeGreaterThan(fastest * 0.8);
     });
   }
+
+  it('places item boxes in rows of three, deterministically', () => {
+    const rows = (seed: number) => generateTrack(1, seed).segments.filter((x) => x.boxes).map((x) => x.index);
+    expect(rows(5).length).toBeGreaterThan(4);
+    expect(rows(5)).toEqual(rows(5));
+    expect(generateTrack(1, 5).segments.find((x) => x.boxes)!.boxes).toEqual([-0.55, 0, 0.55]);
+  });
 
   it('only the narrow worlds have falls, and hazards match the world theme', () => {
     const count = (w: number, k: 'hazard' | 'pad') => generateTrack(w, 7).segments.filter((s) => s[k]).length;
