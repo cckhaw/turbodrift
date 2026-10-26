@@ -4,6 +4,7 @@ import RaceScreen from './components/RaceScreen';
 import Results from './components/Results';
 import LeaderboardModal from './components/LeaderboardModal';
 import SettingsModal from './components/SettingsModal';
+import HowToPlayModal from './components/HowToPlayModal';
 import { synth } from './audio/synth';
 import { dailyFor, isDaily as isDailyTrack, recordDaily } from './utils/daily';
 import { loadKart, loadMode, saveKart, saveMode, type Mode } from './game/karts';
@@ -13,6 +14,7 @@ import { flushPending, getPlayerName, saveScore, watchConnectivity } from './uti
 import { syncCloud } from './utils/cloud';
 import { loadProgress, recordFinish, type Progress } from './utils/progress';
 import { randomSeed } from './utils/rng';
+import { markTutorialSeen, TUTORIAL_SEED, TUTORIAL_WORLD, tutorialSeen } from './utils/tutorial';
 
 type Screen = 'menu' | 'race' | 'results';
 
@@ -48,6 +50,9 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [mode, setModeState] = useState<Mode>(loadMode);
   const [kart, setKartState] = useState(() => loadKart().id);
+  const [tutorial, setTutorial] = useState(false);
+  const [howTo, setHowTo] = useState(false);
+  const [offer, setOffer] = useState(false);
 
   useEffect(() => {
     void flushPending();
@@ -70,8 +75,14 @@ export default function App() {
     syncUrl(world, s);
   };
 
-  const race = () => {
+  /** Start whatever mode is selected. First-time players get offered the tutorial before their first race. */
+  const race = (skipOffer = false) => {
+    if (!skipOffer && mode === 'race' && !tutorialSeen()) {
+      setOffer(true);
+      return;
+    }
     synth.init(); // needs a user gesture
+    setTutorial(false);
     setResult(null);
     setUnlock(null);
     setRunId((n) => n + 1);
@@ -95,8 +106,34 @@ export default function App() {
     setScreen('results');
   }, []);
 
+  const startTutorial = () => {
+    synth.init();
+    setSettingsOpen(false);
+    setHowTo(false);
+    setOffer(false);
+    setResult(null);
+    setUnlock(null);
+    setTutorial(true); // endless practice on a fixed easy track, with guided lessons on top
+    setRunId((n) => n + 1);
+    setScreen('race');
+  };
+
+  const startPractice = () => {
+    saveMode('practice');
+    setModeState('practice');
+    setSettingsOpen(false);
+    setHowTo(false);
+    synth.init();
+    setTutorial(false);
+    setResult(null);
+    setUnlock(null);
+    setRunId((n) => n + 1);
+    setScreen('race');
+  };
+
   const quit = () => {
     synth.stopMusic();
+    setTutorial(false);
     setScreen('menu');
   };
 
@@ -131,9 +168,12 @@ export default function App() {
             setKartState(k);
           }}
           onSettings={() => setSettingsOpen(true)}
+          onHowTo={() => setHowTo(true)}
+          onTutorial={startTutorial}
+          newPlayer={!tutorialSeen()}
           onWorld={pickWorld}
           onSeed={pickSeed}
-          onRace={race}
+          onRace={() => race()}
           onBoard={() => setBoard(true)}
           onMute={() => {
             synth.init();
@@ -142,12 +182,12 @@ export default function App() {
           }}
         />
       )}
-      {screen !== 'menu' && <RaceScreen key={runId} world={world} seed={seed} mode={mode} kart={kart} onFinish={finish} onQuit={quit} onSettings={() => setSettingsOpen(true)} />}
+      {screen !== 'menu' && <RaceScreen key={runId} world={tutorial ? TUTORIAL_WORLD : world} seed={tutorial ? TUTORIAL_SEED : seed} mode={tutorial ? 'practice' : mode} kart={kart} tutorial={tutorial} onFinish={finish} onQuit={quit} onSettings={() => setSettingsOpen(true)} />}
       {screen === 'results' && result && (
         <Results
           result={result}
           newUnlock={unlock}
-          onAgain={race}
+          onAgain={() => race(true)}
           onMenu={quit}
           onBoard={() => setBoard(true)}
           onNext={
@@ -159,7 +199,7 @@ export default function App() {
                   setSeed(s);
                   setFromLink(false);
                   syncUrl(w, s);
-                  setTimeout(race, 0);
+                  setTimeout(() => race(true), 0);
                 }
               : null
           }
@@ -175,7 +215,34 @@ export default function App() {
           }}
           onProgress={setProgress}
           onClose={() => setSettingsOpen(false)}
+          onTutorial={startTutorial}
+          onHowTo={() => setHowTo(true)}
+          onPractice={startPractice}
+          inRace={screen !== 'menu'}
         />
+      )}
+      {howTo && <HowToPlayModal onClose={() => setHowTo(false)} onTutorial={screen === 'menu' ? startTutorial : undefined} onPractice={screen === 'menu' ? startPractice : undefined} />}
+      {offer && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-5" role="dialog" aria-modal="true" aria-label="First race">
+          <div className="glass animate-rise w-full max-w-sm space-y-3 p-5 text-center !bg-[rgba(16,22,38,0.92)]">
+            <div className="text-4xl">🏎️</div>
+            <h2 className="text-xl font-bold tracking-tight">First time here?</h2>
+            <p className="text-sm text-white/65">Take a one-minute guided lap to learn steering, drifting, boosting and items. You can replay it any time from Settings.</p>
+            <button onClick={startTutorial} className="btn-primary w-full">
+              Show me how
+            </button>
+            <button
+              onClick={() => {
+                markTutorialSeen('skipped');
+                setOffer(false);
+                race(true);
+              }}
+              className="btn-glass w-full"
+            >
+              Skip, just race
+            </button>
+          </div>
+        </div>
       )}
       {board && <LeaderboardModal world={world} seed={seed} last={result} onClose={() => setBoard(false)} />}
     </div>

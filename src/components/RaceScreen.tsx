@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Pause, Play, Flag, Zap } from 'lucide-react';
 import { Engine } from '../game/engine';
+import TutorialCoach from './TutorialCoach';
 import { ITEM_INFO } from '../game/items';
 import type { Mode } from '../game/karts';
 import { loadSettings } from '../utils/settings';
@@ -16,11 +17,13 @@ interface Props {
   onFinish: (r: RaceResult) => void;
   onQuit: () => void;
   onSettings: () => void;
+  /** Show the guided lessons on top of (endless) practice. */
+  tutorial?: boolean;
 }
 
 const LVL_COLOR = ['#ffffff', '#5AC8FA', '#FF2D55'];
 
-export default function RaceScreen({ world, seed, mode, kart, onFinish, onQuit, onSettings }: Props) {
+export default function RaceScreen({ world, seed, mode, kart, onFinish, onQuit, onSettings, tutorial = false }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<Engine | null>(null);
   const finishRef = useRef(onFinish);
@@ -29,6 +32,7 @@ export default function RaceScreen({ world, seed, mode, kart, onFinish, onQuit, 
   const [paused, setPaused] = useState(false);
   const [steerUi, setSteerUi] = useState(0);
   const [driftHeld, setDriftHeld] = useState(false);
+  const [coachOpen, setCoachOpen] = useState(tutorial);
   const steerRange = useRef(loadSettings().steerRange); // px of thumb travel for full lock
   const drag = useRef<{ id: number; origin: number } | null>(null);
   const w = WORLDS[world - 1];
@@ -124,16 +128,23 @@ export default function RaceScreen({ world, seed, mode, kart, onFinish, onQuit, 
 
       {/* HUD */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-2 px-3 pt-[calc(env(safe-area-inset-top)+10px)]">
-        <div className="glass !rounded-2xl px-3.5 py-2 text-left">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-white/50">Position</p>
-          <p className="text-3xl font-extrabold leading-none tabular-nums">
-            {hud?.position ?? '-'}
-            <span className="text-base font-semibold text-white/50">/{hud?.total ?? 6}</span>
-          </p>
-        </div>
+        {mode === 'practice' ? (
+          <div className="glass !rounded-2xl px-3.5 py-2 text-left">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-apple-yellow">Practice</p>
+            <p className="text-sm font-semibold leading-tight text-white/70">No timing, no pressure</p>
+          </div>
+        ) : (
+          <div className="glass !rounded-2xl px-3.5 py-2 text-left">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-white/50">Position</p>
+            <p className="text-3xl font-extrabold leading-none tabular-nums">
+              {hud?.position ?? '-'}
+              <span className="text-base font-semibold text-white/50">/{hud?.total ?? 6}</span>
+            </p>
+          </div>
+        )}
         <div className="glass !rounded-2xl px-3.5 py-2 text-center">
           <p className="flex items-center justify-center gap-1 text-[10px] font-semibold uppercase tracking-widest text-white/50">
-            <Flag size={10} /> Lap {hud?.lap ?? 1}/{hud?.laps ?? 3}
+            <Flag size={10} /> {mode === 'practice' ? 'Lap time' : `Lap ${hud?.lap ?? 1}/${hud?.laps ?? 3}`}
           </p>
           <p className="font-mono text-lg font-semibold tabular-nums">{formatTime(hud?.lapTime ?? 0)}</p>
         </div>
@@ -155,12 +166,14 @@ export default function RaceScreen({ world, seed, mode, kart, onFinish, onQuit, 
       )}
 
       {hud?.toast && (
-        <div key={hud.toast.id} className="pointer-events-none absolute inset-x-0 top-[26%] z-20 flex justify-center">
+        <div key={hud.toast.id} className={`pointer-events-none absolute inset-x-0 z-20 flex justify-center ${tutorial && coachOpen ? 'top-[46%]' : 'top-[26%]'}`}>
           <span className="animate-toast rounded-pill bg-black/45 px-5 py-2 text-xl font-extrabold tracking-wide backdrop-blur-md" style={{ color: hud.boosting ? '#5AC8FA' : '#fff' }}>
             {hud.toast.text}
           </span>
         </div>
       )}
+
+      {tutorial && coachOpen && <TutorialCoach hud={hud} steer={steerUi} onKeepPractising={() => setCoachOpen(false)} onExit={onQuit} />}
 
       {cd != null && (
         <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">

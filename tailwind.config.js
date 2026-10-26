@@ -27,9 +27,11 @@ export default {
       keyframes: {
         pop: { '0%': { transform: 'scale(1.8)', opacity: '0' }, '25%': { opacity: '1' }, '100%': { transform: 'scale(1)', opacity: '0.9' } },
         rise: { '0%': { transform: 'translateY(16px)', opacity: '0' }, '100%': { transform: 'translateY(0)', opacity: '1' } },
+        sweep: { '0%': { transform: 'translateX(-46px)' }, '100%': { transform: 'translateX(46px)' } },
+        halo: { '0%': { transform: 'scale(0.9)', opacity: '0.9' }, '100%': { transform: 'scale(1.25)', opacity: '0' } },
         toast: { '0%': { transform: 'translateY(-8px)', opacity: '0' }, '15%,85%': { transform: 'translateY(0)', opacity: '1' }, '100%': { opacity: '0' } },
       },
-      animation: { pop: 'pop 0.9s ease-out both', rise: 'rise 0.35s cubic-bezier(.2,.8,.2,1) both', toast: 'toast 1.8s ease both' },
+      animation: { sweep: 'sweep 1.1s ease-in-out infinite alternate', halo: 'halo 1.2s ease-out infinite', pop: 'pop 0.9s ease-out both', rise: 'rise 0.35s cubic-bezier(.2,.8,.2,1) both', toast: 'toast 1.8s ease both' },
     },
   },
   plugins: [],

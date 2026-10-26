@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, Cloud, Copy, Trash2, X } from 'lucide-react';
+import { Check, Cloud, Copy, GraduationCap, Trash2, X } from 'lucide-react';
 import { synth } from '../audio/synth';
 import { disableCloud, enableCloud, formatCode, getSyncCode, restoreFromCode } from '../utils/cloud';
 import { globalEnabled } from '../utils/api';
@@ -14,6 +14,11 @@ interface Props {
   onMute: () => void;
   onProgress: (p: Progress) => void;
   onClose: () => void;
+  onTutorial: () => void;
+  onHowTo: () => void;
+  onPractice: () => void;
+  /** a race is in progress, so starting a lesson would abandon it */
+  inRace: boolean;
 }
 
 function Row({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
@@ -47,7 +52,7 @@ const Section = ({ title, children }: { title: string; children: React.ReactNode
   </section>
 );
 
-export default function SettingsModal({ muted, onMute, onProgress, onClose }: Props) {
+export default function SettingsModal({ muted, onMute, onProgress, onClose, onTutorial, onHowTo, onPractice, inRace }: Props) {
   const [s, setS] = useState<Settings>(loadSettings);
   const [name, setName] = useState(getPlayerName());
   const [haptics, setHapticsState] = useState(hapticsEnabled());
@@ -99,6 +104,26 @@ export default function SettingsModal({ muted, onMute, onProgress, onClose }: Pr
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 pb-5">
+          <Section title="Help">
+            <div className="py-3">
+              <p className="flex items-center gap-2 text-[15px] font-medium">
+                <GraduationCap size={16} className="text-arcade-cyan" /> Learn to drive
+              </p>
+              <p className="mt-1 text-xs text-white/45">{inRace ? 'Available from the main menu (it would end your current race).' : 'Steering, drifting, boosting and items, on an easy practice track.'}</p>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button disabled={inRace} onClick={onTutorial} className="btn-primary col-span-2 !py-2.5 text-sm disabled:opacity-40">
+                  Replay the tutorial
+                </button>
+                <button onClick={onHowTo} className="btn-glass !px-3 !py-2.5 text-sm">
+                  Controls guide
+                </button>
+                <button disabled={inRace} onClick={onPractice} className="btn-glass !px-3 !py-2.5 text-sm disabled:opacity-40">
+                  Practice mode
+                </button>
+              </div>
+            </div>
+          </Section>
+
           <Section title="Audio">
             <Row label="Sound">
               <Toggle on={!muted} onChange={onMute} label="Sound" />
