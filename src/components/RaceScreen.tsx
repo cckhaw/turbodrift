@@ -1,7 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pause, Play, Flag, Zap } from 'lucide-react';
 import { Engine } from '../game/engine';
+import Minimap from './Minimap';
+import RoadAhead from './RoadAhead';
 import TutorialCoach from './TutorialCoach';
+import { buildTrackMap } from '../game/minimap';
+import { generateTrack } from '../game/track';
 import { ITEM_INFO } from '../game/items';
 import type { Mode } from '../game/karts';
 import { loadSettings } from '../utils/settings';
@@ -33,6 +37,7 @@ export default function RaceScreen({ world, seed, mode, kart, onFinish, onQuit, 
   const [steerUi, setSteerUi] = useState(0);
   const [driftHeld, setDriftHeld] = useState(false);
   const [coachOpen, setCoachOpen] = useState(tutorial);
+  const trackMap = useMemo(() => buildTrackMap(generateTrack(world, seed).segments.map((s) => s.curve)), [world, seed]);
   const steerRange = useRef(loadSettings().steerRange); // px of thumb travel for full lock
   const drag = useRef<{ id: number; origin: number } | null>(null);
   const w = WORLDS[world - 1];
@@ -152,6 +157,13 @@ export default function RaceScreen({ world, seed, mode, kart, onFinish, onQuit, 
           <Pause size={20} />
         </button>
       </div>
+
+      {hud && !(tutorial && coachOpen) && (
+        <div className="pointer-events-none absolute right-3 top-[calc(env(safe-area-inset-top)+78px)] z-20 flex flex-col items-end gap-2">
+          <Minimap map={trackMap} racers={hud.racers} />
+          <RoadAhead ahead={hud.ahead} hairpinTrack={w.hairpins} />
+        </div>
+      )}
 
       {hud && hud.total > 1 && (
         <ul className="pointer-events-none absolute left-3 top-[calc(env(safe-area-inset-top)+84px)] z-20 space-y-1">

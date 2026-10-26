@@ -1,5 +1,6 @@
 export type SceneryKind = 'tower' | 'sign' | 'pylon' | 'cloud' | 'island' | 'rock' | 'lavaPillar' | 'crystal';
 import type { Item } from './items.js';
+import type { Ahead } from './lookahead.js';
 
 export type HazardKind = 'wind' | 'block';
 
@@ -140,6 +141,9 @@ export interface HudSnapshot {
   item: Item | null;
   itemRolling: boolean;
   shield: boolean;
+  /** Everyone on track for the map: `pos` is their race position (0 for the ghost), `t` is how far round the lap (0..1). */
+  racers: { id: number; color: string; you: boolean; pos: number; t: number; ghost?: boolean }[];
+  ahead: Ahead;
 }
 
 import type { Replay } from './replay.js';

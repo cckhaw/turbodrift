@@ -122,7 +122,7 @@ export default function Menu(p: Props) {
 
         <section className="mt-6 space-y-3">
           {WORLDS.map((wd, i) => {
-            const locked = wd.id > p.progress.unlocked && !(p.fromLink && wd.id === p.world);
+            const locked = wd.id > p.progress.unlocked && p.mode !== 'practice' && !(p.fromLink && wd.id === p.world);
             const sel = wd.id === p.world;
             const medal = p.progress.medals[wd.id];
             return (
@@ -141,7 +141,7 @@ export default function Menu(p: Props) {
                         {wd.id}. {wd.name}
                       </h2>
                     </div>
-                    <p className="mt-1 text-sm text-white/70">{locked ? 'Finish on the podium (top 3) in the previous world to unlock.' : wd.tagline}</p>
+                    <p className="mt-1 text-sm text-white/70">{locked ? 'Finish on the podium (top 3) in the previous world to unlock. Open in Practice.' : wd.tagline}</p>
                   </div>
                   {locked ? <Lock size={20} className="mt-1 shrink-0 text-white/60" /> : <span className={`shrink-0 rounded-pill px-2.5 py-1 text-[11px] font-semibold ${DIFF_COLOR[i]}`}>{wd.difficulty}</span>}
                 </div>

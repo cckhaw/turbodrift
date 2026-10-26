@@ -22,7 +22,7 @@ A mobile-first arcade kart racer that runs in the browser: pseudo-3D drift racin
 ```bash
 npm install
 npm run dev        # http://localhost:5173 (also reachable from your phone on the same network)
-npm test           # 101 tests
+npm test           # 117 tests
 npm run build      # typecheck + production build
 ```
 
@@ -53,10 +53,15 @@ The kart accelerates automatically.
 ## Features
 
 ### Game modes
-- **Practice**: endless solo driving on the track you've selected, with item boxes and no countdown. Nothing is timed, recorded or unlocked, so it's the place to get used to the controls, the HUD and the items.
+- **Practice**: endless solo driving on the track you've selected, with item boxes and no countdown. Nothing is timed, recorded or unlocked, so it's the place to get used to the controls, the HUD and the items. **All three worlds are open in Practice** even if you haven't unlocked them for racing (switching back to Race or Time Trial drops you to your highest unlocked world).
 - **Race**: 3 laps against 5 bots (CyberBot-01, NeonViper, GlitchRider, ByteBlaze, ChromeFang, PulseNova pool), with item boxes. Finishing in the top 3 unlocks the next world.
 - **Time Trial**: solo, no bots or items, racing your own best-lap **ghost** for that kart. This is the mode whose times go on the global leaderboard.
 - **Daily challenge**: one track per UTC day for everyone (the world rotates 1 → 2 → 3, the seed is derived from the date), played as a Time Trial. Because everyone gets the same seed, the leaderboard for that seed *is* the daily board. The menu card shows your best, the time until the reset, a ✅ once done and a 🔥 streak of consecutive days.
+
+
+### Track map and road ahead
+
+Two panels sit under the pause button during a run. The **track map** shows the whole lap with every kart as a coloured dot carrying its race position: the leader is outlined in gold, **your dot glows**, your ghost is a dashed *G*, and the stretch just ahead of you is highlighted. **Road ahead** draws the next ~300 m with boost pads, item boxes, wind and hazards, plus a label such as *Hairpin left · in 80 m* (*then right* for S-bends). The map is a schematic built from the track's curvature (`src/game/minimap.ts`) and the look-ahead scans the real segments (`src/game/lookahead.ts`). Both hide while a tutorial card is open.
 
 ### Tutorial
 A guided lap on an easy fixed track (world 1, seed 4242), run in endless Practice mode with lesson cards on top. The cards watch what you actually do and move on when you've done it: **steer** left and right → **drift** through a turn (hold DRIFT) → **let go to boost** (a boost pad doesn't count, it has to come from releasing a drift) → **grab an item** and use it. Every lesson has a *Skip this step* link and the whole thing can be dismissed with the × (you stay on the practice track). The controls glow when they're the thing to use. The step logic is a pure state machine (`src/utils/tutorial.ts`) and a test drives the real engine through all four lessons on the tutorial track.
@@ -205,7 +210,7 @@ npm test             # vitest run
 npm run typecheck
 ```
 
-101 tests in `tests/` (they also run in CI):
+117 tests in `tests/` (they also run in CI):
 
 | File | Covers |
 |---|---|
@@ -215,6 +220,7 @@ npm run typecheck
 | `save`, `cloud` | save validation, sync codes, forward-only merging, device A → device B restore through the real API logic |
 | `queue` | offline queue: retries, ordering, throttling, concurrency, expiry, regression for the launch-time flush |
 | `tutorial` | the lesson state machine (including that a boost pad can't pass the boost lesson), first-run flag, practice mode being endless and leaving no records, and every lesson being completable on the tutorial track |
+| `minimap`, `lookahead`, `hud` | closed non-pinching track maps for every world and seed, bend detection (direction, severity, distance, S-bends, wrap past the finish), and the HUD's racer markers (one *you*, unique positions) |
 | `ghost`, `daily`, `items`, `format-share`, `cleanup` | ghosts per kart and settings, daily rotation and streaks, item odds and kart stats, scorecard text, deployment selection |
 
 API tests run against an in-memory Postgres ([PGlite](https://pglite.dev)), so no database is needed.
