@@ -4,11 +4,11 @@ import { Engine } from '../game/engine';
 import Minimap from './Minimap';
 import RoadAhead from './RoadAhead';
 import TutorialCoach from './TutorialCoach';
-import { buildTrackMap } from '../game/minimap';
+import { buildTrackMap, trackMarks } from '../game/minimap';
 import { generateTrack } from '../game/track';
 import { ITEM_INFO } from '../game/items';
 import type { Mode } from '../game/karts';
-import { loadSettings } from '../utils/settings';
+import { loadSettings, nextHudMode, saveSettings, type HudMode } from '../utils/settings';
 import { WORLDS } from '../game/worlds';
 import type { HudSnapshot, RaceResult } from '../game/types';
 import { formatTime } from '../utils/format';
@@ -37,7 +37,17 @@ export default function RaceScreen({ world, seed, mode, kart, onFinish, onQuit, 
   const [steerUi, setSteerUi] = useState(0);
   const [driftHeld, setDriftHeld] = useState(false);
   const [coachOpen, setCoachOpen] = useState(tutorial);
-  const trackMap = useMemo(() => buildTrackMap(generateTrack(world, seed).segments.map((s) => s.curve)), [world, seed]);
+  const [hudMode, setHudMode] = useState<HudMode>(() => loadSettings().hud);
+  const { trackMap, marks } = useMemo(() => {
+    const { segments } = generateTrack(world, seed);
+    return { trackMap: buildTrackMap(segments.map((s) => s.curve)), marks: trackMarks(segments) };
+  }, [world, seed]);
+  /** tap the panels to cycle full → compact → off; the choice is remembered */
+  const cycleHud = () => {
+    const next = nextHudMode(hudMode);
+    setHudMode(next);
+    saveSettings({ hud: next });
+  };
   const steerRange = useRef(loadSettings().steerRange); // px of thumb travel for full lock
   const drag = useRef<{ id: number; origin: number } | null>(null);
   const w = WORLDS[world - 1];
@@ -85,6 +95,7 @@ export default function RaceScreen({ world, seed, mode, kart, onFinish, onQuit, 
   useEffect(() => {
     engineRef.current?.setPaused(paused);
     steerRange.current = loadSettings().steerRange; // may have been changed from the pause menu
+    setHudMode(loadSettings().hud);
   }, [paused]);
 
   // ---- thumb steering: drag anywhere; the anchor follows the thumb so reversing is instant ----
@@ -159,10 +170,21 @@ export default function RaceScreen({ world, seed, mode, kart, onFinish, onQuit, 
       </div>
 
       {hud && !(tutorial && coachOpen) && (
-        <div className="pointer-events-none absolute right-3 top-[calc(env(safe-area-inset-top)+78px)] z-20 flex flex-col items-end gap-2">
-          <Minimap map={trackMap} racers={hud.racers} />
-          <RoadAhead ahead={hud.ahead} hairpinTrack={w.hairpins} />
-        </div>
+        <button
+          aria-label={`Race panels: ${hudMode}. Tap to change`}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={cycleHud}
+          className="absolute right-3 top-[calc(env(safe-area-inset-top)+78px)] z-20 flex flex-col items-end gap-2"
+        >
+          {hudMode === 'off' ? (
+            <span className="glass !rounded-pill px-3 py-1.5 text-[11px] font-semibold text-white/70">Map</span>
+          ) : (
+            <>
+              <Minimap map={trackMap} racers={hud.racers} marks={marks} compact={hudMode === 'compact'} />
+              <RoadAhead ahead={hud.ahead} hairpinTrack={w.hairpins} chipOnly={hudMode === 'compact'} />
+            </>
+          )}
+        </button>
       )}
 
       {hud && hud.total > 1 && (

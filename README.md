@@ -22,7 +22,7 @@ A mobile-first arcade kart racer that runs in the browser: pseudo-3D drift racin
 ```bash
 npm install
 npm run dev        # http://localhost:5173 (also reachable from your phone on the same network)
-npm test           # 117 tests
+npm test           # 121 tests
 npm run build      # typecheck + production build
 ```
 
@@ -61,7 +61,7 @@ The kart accelerates automatically.
 
 ### Track map and road ahead
 
-Two panels sit under the pause button during a run. The **track map** shows the whole lap with every kart as a coloured dot carrying its race position: the leader is outlined in gold, **your dot glows**, your ghost is a dashed *G*, and the stretch just ahead of you is highlighted. **Road ahead** draws the next ~300 m with boost pads, item boxes, wind and hazards, plus a label such as *Hairpin left · in 80 m* (*then right* for S-bends). The map is a schematic built from the track's curvature (`src/game/minimap.ts`) and the look-ahead scans the real segments (`src/game/lookahead.ts`). Both hide while a tutorial card is open.
+Two panels sit under the pause button during a run. The **track map** shows the whole lap with every kart as a coloured dot carrying its race position: the leader is outlined in gold, **your dot glows**, your ghost is a dashed *G*, and the stretch just ahead of you is highlighted. **Road ahead** draws the next ~300 m with boost pads, item boxes, wind and hazards, plus a label such as *Hairpin left · in 80 m* (*then right* for S-bends). The map is a schematic built from the track's curvature (`src/game/minimap.ts`) and the look-ahead scans the real segments (`src/game/lookahead.ts`). Item-box rows (orange diamonds) and boost pads (yellow bars) are marked on the map, and a pack bunched at the start is spread out so every number stays readable. **Tap the panels during a race** to cycle Full → Compact → Off (a small *Map* chip stays so you can bring them back); the choice is remembered and also lives in Settings → Graphics. The panels hide while a tutorial card is open.
 
 ### Tutorial
 A guided lap on an easy fixed track (world 1, seed 4242), run in endless Practice mode with lesson cards on top. The cards watch what you actually do and move on when you've done it: **steer** left and right → **drift** through a turn (hold DRIFT) → **let go to boost** (a boost pad doesn't count, it has to come from releasing a drift) → **grab an item** and use it. Every lesson has a *Skip this step* link and the whole thing can be dismissed with the × (you stay on the practice track). The controls glow when they're the thing to use. The step logic is a pure state machine (`src/utils/tutorial.ts`) and a test drives the real engine through all four lessons on the tutorial track.
@@ -117,7 +117,7 @@ Gear icon on the menu, or **Settings** in the pause menu (the **?** button next 
 | Help | replay the tutorial, controls guide, practice mode (the tutorial and practice are disabled while a race is in progress) |
 | Audio | sound on/off, music volume, effects volume |
 | Controls | steering sensitivity (how far to drag for full lock), vibration |
-| Graphics | battery saver (lower render resolution), screen shake |
+| Graphics | battery saver (lower render resolution), screen shake, race panels: **Full** (map + road ahead), **Compact** (small map + bend call-out) or **Off** |
 | Profile | player name (shown on the leaderboard) |
 | Cloud save | turn on / copy your sync code, restore from a code, stop syncing |
 | Data | reset progress on this device |
@@ -210,7 +210,7 @@ npm test             # vitest run
 npm run typecheck
 ```
 
-117 tests in `tests/` (they also run in CI):
+121 tests in `tests/` (they also run in CI):
 
 | File | Covers |
 |---|---|
@@ -220,7 +220,7 @@ npm run typecheck
 | `save`, `cloud` | save validation, sync codes, forward-only merging, device A → device B restore through the real API logic |
 | `queue` | offline queue: retries, ordering, throttling, concurrency, expiry, regression for the launch-time flush |
 | `tutorial` | the lesson state machine (including that a boost pad can't pass the boost lesson), first-run flag, practice mode being endless and leaving no records, and every lesson being completable on the tutorial track |
-| `minimap`, `lookahead`, `hud` | closed non-pinching track maps for every world and seed, bend detection (direction, severity, distance, S-bends, wrap past the finish), and the HUD's racer markers (one *you*, unique positions) |
+| `minimap`, `lookahead`, `hud`, `settings` | closed non-pinching track maps for every world and seed, bend detection (direction, severity, distance, S-bends, wrap past the finish), map marks and dot spreading, the HUD's racer markers (one *you*, unique positions) and the panel setting |
 | `ghost`, `daily`, `items`, `format-share`, `cleanup` | ghosts per kart and settings, daily rotation and streaks, item odds and kart stats, scorecard text, deployment selection |
 
 API tests run against an in-memory Postgres ([PGlite](https://pglite.dev)), so no database is needed.
