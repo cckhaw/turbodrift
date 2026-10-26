@@ -1,10 +1,15 @@
 name: Keep only the latest deployment
 
-# Vercel's Git integration deploys `main` to production only (see vercel.json: preview builds are skipped).
-# When that production deployment succeeds, delete every older deployment.
-on: deployment_status
+# Vercel's GitHub integration reports through commit statuses and checks, not GitHub Deployments, so a
+# `deployment_status` trigger never fires. Instead: on every push to main, wait for the production deployment
+# built from that commit to become READY, then delete every older deployment.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: # manual run: keeps the production deployment of the current main commit
 
-permissions: {}
+permissions:
+  contents: read
 
 concurrency:
   group: vercel-cleanup
@@ -12,8 +17,8 @@ concurrency:
 
 jobs:
   cleanup:
-    if: github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Production'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -23,6 +28,12 @@ jobs:
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-          VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
-          KEEP_DEPLOYMENT: ${{ github.event.deployment_status.target_url }}
-        run: node scripts/cleanup-deployments.mjs
+          # either secret name works for the team / org id
+          VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID || secrets.VERCEL_ORG_ID }}
+          KEEP_SHA: ${{ github.sha }}
+        run: |
+          if [ -z "$VERCEL_TOKEN" ] || [ -z "$VERCEL_PROJECT_ID" ]; then
+            echo "::warning::Add the VERCEL_TOKEN and VERCEL_PROJECT_ID (and VERCEL_TEAM_ID) repository secrets to enable deployment cleanup."
+            exit 0
+          fi
+          node scripts/cleanup-deployments.mjs

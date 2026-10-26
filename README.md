@@ -49,6 +49,6 @@ Without the API (or in `npm run dev`, unless `VITE_API_BASE` points at a deploye
 
 ## Deployment: production only, latest only
 - `vercel.json` skips every build that is not on `main` (`ignoreCommand`), so **preview deployments are never created**.
-- After a production deployment succeeds, `.github/workflows/cleanup-deployments.yml` (or `npm run deploy` locally) runs `scripts/cleanup-deployments.mjs`, which deletes **all older deployments** and keeps only the latest. It refuses to delete anything unless the new deployment is found and `READY`.
-- Required GitHub secrets: `VERCEL_TOKEN`, `VERCEL_PROJECT_ID`, `VERCEL_TEAM_ID` (omit for a personal account).
-- Manual deploy: `npx vercel link` once, then `npm run deploy` (always `--prod`). Preview with `npm run cleanup:deployments -- --dry-run` (set `KEEP_DEPLOYMENT`).
+- On every push to `main`, `.github/workflows/cleanup-deployments.yml` waits for the production deployment built from that commit to become `READY` (Vercel's integration reports via commit statuses, not GitHub Deployments, so a `deployment_status` trigger can't work) and runs `scripts/cleanup-deployments.mjs`, which deletes **all older deployments** and keeps only the latest. It refuses to delete anything unless the deployment to keep is found and `READY`, aborts if that build fails, and never touches anything newer. `npm run deploy` does the same locally. You can also run the workflow manually (Actions → *Keep only the latest deployment* → Run workflow).
+- Required GitHub Actions secrets: `VERCEL_TOKEN`, `VERCEL_PROJECT_ID`, and `VERCEL_TEAM_ID` (or `VERCEL_ORG_ID`; either name works; omit for a personal account). Without the token and project id the job just prints a warning.
+- Manual deploy: `npx vercel link` once, then `npm run deploy` (always `--prod`). Preview with `npm run cleanup:deployments -- --dry-run` (set `KEEP_DEPLOYMENT=<id|url>` or `KEEP_SHA=<commit>`).
