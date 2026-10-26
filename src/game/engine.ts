@@ -119,6 +119,7 @@ export class Engine {
     this.kart = kartById(o.kart ?? KARTS[0].id);
     this.itemRng = new Rng(hashSeed(o.world, o.seed, 555));
     this.player = this.makeCar(0, 'YOU', this.kart.color, this.kart.accent, true);
+    this.player.shape = this.kart.id as Car['shape'];
     this.setupGrid(r);
     this.ghost = loadGhost(o.world, o.seed);
     if (this.ghost) this.ghostCar = { ...this.makeCar(99, 'BEST', '#ffffff', '#ffffff', false), ghost: true };
@@ -154,6 +155,7 @@ export class Engine {
       } else {
         const [c, a] = BOT_COLORS[botIdx % BOT_COLORS.length];
         const bot = this.makeCar(botIdx + 1, BOT_NAMES[botIdx % BOT_NAMES.length], c, a, false);
+        bot.shape = KARTS[botIdx % KARTS.length].id as Car['shape'];
         bot.dist = dist;
         bot.x = col;
         bot.skill = this.wd.botPace * r.range(0.95, 1.03);
@@ -920,7 +922,7 @@ export class Engine {
           const sx = lerp(seg.p1.screen.x, seg.p2.screen.x, pct) + (sc * car.x * roadW * W) / 2;
           const sy = lerp(seg.p1.screen.y, seg.p2.screen.y, pct);
           const kw = (sc * KART_W * W) / 2;
-          drawKart(c, sx, sy, kw, car.color, car.accent, { tilt: 0, drift: 0, boost: !car.ghost && (car.boostT > 0 || car.speed > this.wd.maxSpeed * 1.05), flicker: Math.random(), fall: 0, blink: !!car.ghost, spin: car.spinT > 0 ? 1 - car.spinT / SPIN_TIME : 0, shield: car.shieldT > 0 }, seg.clip);
+          drawKart(c, sx, sy, kw, car.color, car.accent, { tilt: 0, drift: 0, boost: !car.ghost && (car.boostT > 0 || car.speed > this.wd.maxSpeed * 1.05), flicker: Math.random(), fall: 0, blink: !!car.ghost, spin: car.spinT > 0 ? 1 - car.spinT / SPIN_TIME : 0, shield: car.shieldT > 0, shape: car.shape }, seg.clip);
           if (kw > 26 && kw < W * 0.2 && sy < H * 0.8 && !car.ghost) {
             c.font = `600 ${Math.max(9, Math.round(kw * 0.17))}px -apple-system, system-ui, sans-serif`;
             c.textAlign = 'center';
@@ -956,7 +958,7 @@ export class Engine {
       kw,
       this.player.color,
       accent,
-      { tilt: this.visTilt, drift: this.visDrift, boost: this.boostT > 0, flicker: Math.random(), fall: this.fallT > 0 ? clampFall(this.fallT) : 0, blink: this.blinkT > 0 && Math.floor(this.time * 14) % 2 === 0, spin: this.visSpin, shield: this.player.shieldT > 0 },
+      { tilt: this.visTilt, drift: this.visDrift, boost: this.boostT > 0, flicker: Math.random(), fall: this.fallT > 0 ? clampFall(this.fallT) : 0, blink: this.blinkT > 0 && Math.floor(this.time * 14) % 2 === 0, spin: this.visSpin, shield: this.player.shieldT > 0, shape: this.player.shape },
       0,
     );
     // particles in screen space

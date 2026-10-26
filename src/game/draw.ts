@@ -299,6 +299,7 @@ export interface KartFx {
   fall: number; // 0..1 falling progress
   blink: boolean;
   spin?: number; // 0..1 progress of a spin-out
+  shape?: 'comet' | 'rocket' | 'phantom';
   shield?: boolean;
 }
 
@@ -336,25 +337,64 @@ export function drawKart(ctx: Ctx, cx: number, base: number, w: number, color: s
   g.addColorStop(0, color);
   g.addColorStop(1, mix(color.startsWith('#') ? color : '#888888', '#000000', 0.55));
   ctx.fillStyle = g;
+  const shape = fx.shape ?? 'comet';
   ctx.beginPath();
-  ctx.moveTo(-w * 0.36, -w * 0.12);
-  ctx.lineTo(-w * 0.27, -w * 0.52);
-  ctx.lineTo(w * 0.27, -w * 0.52);
-  ctx.lineTo(w * 0.36, -w * 0.12);
+  if (shape === 'rocket') {
+    // tall, pointed nose cone with wide hips
+    ctx.moveTo(-w * 0.4, -w * 0.1);
+    ctx.lineTo(-w * 0.16, -w * 0.6);
+    ctx.lineTo(w * 0.16, -w * 0.6);
+    ctx.lineTo(w * 0.4, -w * 0.1);
+  } else if (shape === 'phantom') {
+    // low, wide and sleek
+    ctx.moveTo(-w * 0.42, -w * 0.1);
+    ctx.lineTo(-w * 0.3, -w * 0.42);
+    ctx.lineTo(w * 0.3, -w * 0.42);
+    ctx.lineTo(w * 0.42, -w * 0.1);
+  } else {
+    ctx.moveTo(-w * 0.36, -w * 0.12);
+    ctx.lineTo(-w * 0.27, -w * 0.52);
+    ctx.lineTo(w * 0.27, -w * 0.52);
+    ctx.lineTo(w * 0.36, -w * 0.12);
+  }
   ctx.closePath();
   ctx.fill();
+  if (shape === 'phantom') {
+    ctx.fillStyle = accent;
+    ctx.fillRect(-w * 0.03, -w * 0.42, w * 0.06, w * 0.32); // glowing spine
+  } else if (shape === 'rocket') {
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.fillRect(-w * 0.03, -w * 0.58, w * 0.06, w * 0.4); // racing stripe
+  }
   // driver
-  ctx.fillStyle = '#e9ecf7';
+  const headY = shape === 'rocket' ? -w * 0.68 : shape === 'phantom' ? -w * 0.5 : -w * 0.62;
+  ctx.fillStyle = shape === 'phantom' ? '#1b1d2a' : '#e9ecf7';
   ctx.beginPath();
-  ctx.arc(0, -w * 0.62, w * 0.13, 0, Math.PI * 2);
+  ctx.arc(0, headY, w * 0.13, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = '#111';
-  ctx.fillRect(-w * 0.1, -w * 0.66, w * 0.2, w * 0.05);
-  // spoiler
+  ctx.fillStyle = shape === 'phantom' ? accent : '#111';
+  ctx.fillRect(-w * 0.1, headY - w * 0.04, w * 0.2, w * 0.05);
+  // spoiler / fins
   ctx.fillStyle = accent;
-  ctx.fillRect(-w * 0.48, -w * 0.56, w * 0.96, w * 0.07);
-  ctx.fillRect(-w * 0.4, -w * 0.52, w * 0.05, w * 0.12);
-  ctx.fillRect(w * 0.35, -w * 0.52, w * 0.05, w * 0.12);
+  if (shape === 'rocket') {
+    ctx.fillRect(-w * 0.55, -w * 0.5, w * 1.1, w * 0.06); // wide wing
+    ctx.fillRect(-w * 0.55, -w * 0.62, w * 0.05, w * 0.18);
+    ctx.fillRect(w * 0.5, -w * 0.62, w * 0.05, w * 0.18);
+  } else if (shape === 'phantom') {
+    for (const s of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(s * w * 0.36, -w * 0.4);
+      ctx.lineTo(s * w * 0.62, -w * 0.62);
+      ctx.lineTo(s * w * 0.46, -w * 0.22);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.fillRect(-w * 0.28, -w * 0.43, w * 0.56, w * 0.03);
+  } else {
+    ctx.fillRect(-w * 0.48, -w * 0.56, w * 0.96, w * 0.07);
+    ctx.fillRect(-w * 0.4, -w * 0.52, w * 0.05, w * 0.12);
+    ctx.fillRect(w * 0.35, -w * 0.52, w * 0.05, w * 0.12);
+  }
   // tail lights
   ctx.fillStyle = '#ff2d55';
   ctx.fillRect(-w * 0.3, -w * 0.3, w * 0.2, w * 0.05);
