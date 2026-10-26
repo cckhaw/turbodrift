@@ -1,5 +1,5 @@
 export type SceneryKind = 'tower' | 'sign' | 'pylon' | 'cloud' | 'island' | 'rock' | 'lavaPillar' | 'crystal';
-import type { Item } from './items';
+import type { Item } from './items.js';
 
 export type HazardKind = 'wind' | 'block';
 
@@ -142,7 +142,10 @@ export interface HudSnapshot {
   shield: boolean;
 }
 
+import type { Replay } from './replay.js';
+
 export interface RaceResult {
+  replay?: Replay;
   mode: 'race' | 'trial';
   kart: string;
   world: number;

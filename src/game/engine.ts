@@ -1,13 +1,15 @@
-import { synth } from '../audio/synth';
-import { Rng, hashSeed } from '../utils/rng';
-import { haptic } from '../utils/haptics';
-import { GHOST_DT, ghostAt, loadGhost, saveGhost, type Ghost } from '../utils/ghost';
-import { BOT_COLORS, BOT_NAMES, LAPS, SEG_LENGTH, WORLDS } from './worlds';
-import { generateTrack } from './track';
-import { KARTS, kartById, type KartSpec } from './karts';
-import { BOX_OFFSETS, BOX_RESPAWN, OIL_LIFE, SHIELD_TIME, SPIN_TIME, rollItem } from './items';
-import { drawBackdrop, drawHazard, drawItemBox, drawKart, drawProp, drawScenery, lerp, makeBackdrop, mix, type Backdrop } from './draw';
-import type { Car, HudSnapshot, RaceResult, Segment, Track, WorldConfig } from './types';
+import { synth } from '../audio/synth.js';
+import { FIXED_DT, ReplayRecorder, encodeRuns, quantizeSteer, type InputRun, type Replay } from './replay.js';
+import { Rng, hashSeed } from '../utils/rng.js';
+import { haptic } from '../utils/haptics.js';
+import { loadSettings, type Settings } from '../utils/settings.js';
+import { GHOST_DT, ghostAt, loadGhost, saveGhost, type Ghost } from '../utils/ghost.js';
+import { BOT_COLORS, BOT_NAMES, LAPS, SEG_LENGTH, WORLDS } from './worlds.js';
+import { generateTrack } from './track.js';
+import { KARTS, kartById, type KartSpec } from './karts.js';
+import { BOX_OFFSETS, BOX_RESPAWN, OIL_LIFE, SHIELD_TIME, SPIN_TIME, rollItem } from './items.js';
+import { drawBackdrop, drawHazard, drawItemBox, drawKart, drawProp, drawScenery, lerp, makeBackdrop, mix, type Backdrop } from './draw.js';
+import type { Car, HudSnapshot, RaceResult, Segment, Track, WorldConfig } from './types.js';
 
 const FOV = 80;
 const CAM_DEPTH = 1 / Math.tan(((FOV / 2) * Math.PI) / 180);
@@ -100,7 +102,17 @@ export class Engine {
   private visSpin = 0;
   private resizeObs?: ResizeObserver;
 
+  // fixed-step simulation, input recording and replay
+  private acc = 0;
+  private cmd = { steer: 0, drift: false };
+  private recorder = new ReplayRecorder();
+  private replayRuns: InputRun[] | null = null;
+  private replayIdx = 0;
+  private replayLeft = 0;
+  private finalResult: RaceResult | null = null;
+
   // karts, items, hazards thrown by cars
+  private settings: Settings;
   private kart: KartSpec;
   private mode: 'race' | 'trial';
   private itemRng: Rng;
@@ -115,17 +127,20 @@ export class Engine {
     this.track = generateTrack(o.world, o.seed);
     const r = new Rng(hashSeed(o.world, o.seed, 99));
     this.backdrop = makeBackdrop(() => r.next());
+    this.settings = loadSettings();
     this.mode = o.mode ?? 'race';
     this.kart = kartById(o.kart ?? KARTS[0].id);
     this.itemRng = new Rng(hashSeed(o.world, o.seed, 555));
     this.player = this.makeCar(0, 'YOU', this.kart.color, this.kart.accent, true);
     this.player.shape = this.kart.id as Car['shape'];
     this.setupGrid(r);
-    this.ghost = loadGhost(o.world, o.seed);
+    this.ghost = loadGhost(o.world, o.seed, this.kart.id);
     if (this.ghost) this.ghostCar = { ...this.makeCar(99, 'BEST', '#ffffff', '#ffffff', false), ghost: true };
     this.resize();
-    this.resizeObs = new ResizeObserver(() => this.resize());
-    this.resizeObs.observe(o.canvas);
+    if (typeof ResizeObserver !== 'undefined') {
+      this.resizeObs = new ResizeObserver(() => this.resize());
+      this.resizeObs.observe(o.canvas);
+    }
   }
 
   // ---------- setup ----------
@@ -168,21 +183,32 @@ export class Engine {
   }
 
   start(): void {
+    synth.setVolumes(this.settings.music, this.settings.sfx);
     synth.startEngine();
     synth.startMusic(this.wd);
     this.last = performance.now();
     const tick = (now: number) => {
       this.raf = requestAnimationFrame(tick);
-      const dt = Math.min(0.05, (now - this.last) / 1000);
+      const dt = Math.min(0.1, (now - this.last) / 1000);
       this.last = now;
-      if (!this.paused) this.update(dt);
+      if (!this.paused) {
+        // fixed 60 Hz steps keep the simulation identical on every device (and replayable on the server)
+        this.acc += dt;
+        let n = 0;
+        while (this.acc >= FIXED_DT && n < 6) {
+          this.update(FIXED_DT);
+          this.acc -= FIXED_DT;
+          n++;
+        }
+        if (n === 6) this.acc = 0;
+      }
       this.render();
     };
     this.raf = requestAnimationFrame(tick);
   }
 
   destroy(): void {
-    cancelAnimationFrame(this.raf);
+    if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(this.raf);
     this.resizeObs?.disconnect();
     synth.stopEngine();
     synth.stopMusic();
@@ -195,10 +221,11 @@ export class Engine {
 
   private resize() {
     const c = this.o.canvas;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const cw = c.clientWidth || window.innerWidth;
-    const ch = c.clientHeight || window.innerHeight;
-    const scale = Math.min(dpr, 1000 / Math.max(cw, 1));
+    const win = typeof window !== 'undefined' ? window : null; // absent when replaying on the server
+    const dpr = Math.min(win?.devicePixelRatio || 1, 2);
+    const cw = c.clientWidth || win?.innerWidth || 390;
+    const ch = c.clientHeight || win?.innerHeight || 844;
+    const scale = Math.min(dpr, (this.settings.quality === 'low' ? 560 : 1000) / Math.max(cw, 1));
     this.W = c.width = Math.max(240, Math.round(cw * scale));
     this.H = c.height = Math.max(240, Math.round(ch * scale));
   }
@@ -213,7 +240,27 @@ export class Engine {
     this.toastT = 1.6;
   }
 
+  /** Sample the player's command for this step (or take it from the replay) and record it. */
+  private readCommand(dt: number) {
+    if (this.replayRuns) {
+      const run = this.replayRuns[Math.min(this.replayIdx, this.replayRuns.length - 1)];
+      this.cmd.steer = run.steer / 127;
+      this.cmd.drift = run.drift;
+      if (--this.replayLeft <= 0 && this.replayIdx < this.replayRuns.length - 1) {
+        this.replayIdx++;
+        this.replayLeft = this.replayRuns[this.replayIdx].steps;
+      }
+      return;
+    }
+    const q = quantizeSteer(this.input.steer);
+    this.cmd.steer = q / 127;
+    this.cmd.drift = this.input.drift;
+    if (Math.abs(dt - FIXED_DT) > 1e-9) this.recorder.valid = false;
+    this.recorder.push(q, this.input.drift);
+  }
+
   private update(dt: number) {
+    this.readCommand(dt);
     this.time += dt;
     if (this.toastT > 0 && (this.toastT -= dt) <= 0) this.toast = null;
 
@@ -249,7 +296,7 @@ export class Engine {
       this.finishT += dt;
       if (!this.reported && this.finishT > 3.2) {
         this.reported = true;
-        this.o.onFinish(this.buildResult());
+        this.o.onFinish({ ...(this.finalResult ?? this.buildResult()), replay: this.getReplay() ?? undefined });
       }
     }
     synth.updateEngine(this.player.speed / this.wd.maxSpeed, this.drifting, this.boostT > 0, this.fallT > 0);
@@ -292,11 +339,11 @@ export class Engine {
       p.spinT -= dt;
       if (this.drifting) this.releaseDrift(true);
     }
-    let steer = spun ? 0 : this.state === 'finished' ? clamp((this.track.line[this.seg(p.dist + 1500).index] - p.x) * 2.5, -1, 1) : this.input.steer;
+    let steer = spun ? 0 : this.state === 'finished' ? clamp((this.track.line[this.seg(p.dist + 1500).index] - p.x) * 2.5, -1, 1) : this.cmd.steer;
     const pct = clamp(p.speed / max, 0, 1.5);
 
     // drift state machine
-    const wantDrift = this.input.drift && this.state === 'racing' && pct > 0.35 && !spun;
+    const wantDrift = this.cmd.drift && this.state === 'racing' && pct > 0.35 && !spun;
     if (wantDrift && !this.drifting && Math.abs(steer) > 0.25) {
       this.drifting = true;
       this.driftDir = Math.sign(steer);
@@ -466,6 +513,21 @@ export class Engine {
         return;
       }
     }
+  }
+
+  /** Time-trial recording for server verification; null if it can't be replayed exactly. */
+  getReplay(): Replay | null {
+    if (this.mode !== 'trial' || !this.recorder.valid || !this.finalResult || this.replayRuns) return null;
+    return { v: 1, world: this.o.world, seed: this.o.seed, kart: this.kart.id, steps: this.recorder.total, data: encodeRuns(this.recorder.runs) };
+  }
+
+  /** Server side: drive the engine from recorded inputs (held at the last input once they run out). */
+  runReplay(runs: InputRun[], maxSteps: number): RaceResult | null {
+    this.replayRuns = runs;
+    this.replayIdx = 0;
+    this.replayLeft = runs[0].steps;
+    for (let i = 0; i < maxSteps && !this.finalResult; i++) this.update(FIXED_DT);
+    return this.finalResult;
   }
 
   /** Player taps the item button. */
@@ -673,7 +735,7 @@ export class Engine {
       const lapMs = this.lapT * 1000;
       if (this.rec.d.length > 5 && (!this.ghost || lapMs < this.ghost.lapMs)) {
         this.ghost = { lapMs, d: this.rec.d, x: this.rec.x };
-        saveGhost(this.o.world, this.o.seed, this.ghost);
+        saveGhost(this.o.world, this.o.seed, this.kart.id, this.ghost);
         this.ghostCar ??= { ...this.makeCar(99, 'BEST', '#ffffff', '#ffffff', false), ghost: true };
         this.say('NEW BEST LAP');
       }
@@ -687,6 +749,7 @@ export class Engine {
         p.finishTime = this.raceT * 1000;
         this.state = 'finished';
         this.drifting = false;
+        this.finalResult = this.buildResult();
         const pos = this.rank().indexOf(p) + 1;
         synth.finish(pos <= 3);
         haptic.finish();
@@ -786,7 +849,7 @@ export class Engine {
     const hz = Math.round(H * HORIZON);
 
     c.save();
-    if (this.shake > 0) c.translate((Math.random() - 0.5) * this.shake * 10, (Math.random() - 0.5) * this.shake * 8);
+    if (this.shake > 0 && this.settings.shake) c.translate((Math.random() - 0.5) * this.shake * 10, (Math.random() - 0.5) * this.shake * 8);
 
     drawBackdrop(c, W, H, hz, wd, this.backdrop, this.bgScroll, this.time);
     c.fillStyle = wd.grass[0];

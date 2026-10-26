@@ -1,4 +1,4 @@
-import type { Hazard, Scenery, WorldConfig } from './types';
+import type { Hazard, Scenery, WorldConfig } from './types.js';
 
 type Ctx = CanvasRenderingContext2D;
 

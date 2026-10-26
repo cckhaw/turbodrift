@@ -1,5 +1,7 @@
+import type { Replay } from '../game/replay';
 import { WORLDS } from '../game/worlds';
 import { Rng, hashSeed } from './rng';
+import { api, globalEnabled } from './api';
 
 export interface ScoreEntry {
   name: string;
@@ -16,15 +18,12 @@ export interface Board {
   source: 'global' | 'offline' | 'local';
 }
 
-export const globalEnabled = (): boolean => import.meta.env.PROD || Boolean(API);
+export { globalEnabled };
 
 const KEY = 'turbodrift.scores.v1';
 const NAME_KEY = 'turbodrift.name';
 const CLIENT_KEY = 'turbodrift.client';
 const PENDING_KEY = 'turbodrift.pending.v1';
-/** Same-origin Vercel functions in production; set VITE_API_BASE to hit a deployed API from `npm run dev`. */
-const API = (import.meta.env.VITE_API_BASE as string | undefined) ?? '';
-
 const GHOSTS = ['VoltRunner', 'NightDrift', 'PixelRacer', 'ApexKid', 'SynthWolf', 'RubberBurn', 'HaloGT', 'Kira-9', 'TurboToast', 'LaserLine', 'Zenith', 'DriftMonk', 'Hyperion', 'MochiMax'];
 
 export const getPlayerName = (): string => {
@@ -74,56 +73,93 @@ const clientId = (): string => {
   }
 };
 
-async function api(path: string, init: RequestInit = {}): Promise<Response> {
-  const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), 6000);
-  try {
-    const res = await fetch(`${API}${path}`, { ...init, signal: ctl.signal, headers: { 'Content-Type': 'application/json', ...init.headers } });
-    if (!res.ok) throw new Error(`${res.status}`);
-    return res;
-  } finally {
-    clearTimeout(timer);
-  }
+/** A verified-time-trial submission waiting to be sent. Kept until the server accepts or definitively rejects it. */
+interface Pending {
+  id: string;
+  name: string;
+  replay: Replay;
+  at: number;
 }
 
-type Pending = { name: string; lapMs: number; totalMs: number; world: number; seed: number };
+const MAX_PENDING = 10;
+const MAX_AGE_MS = 7 * 24 * 3600 * 1000;
 
 const readPending = (): Pending[] => {
   try {
-    return JSON.parse(localStorage.getItem(PENDING_KEY) || '[]');
+    const v = JSON.parse(localStorage.getItem(PENDING_KEY) || '[]');
+    return Array.isArray(v) ? v.filter((e) => e && e.replay && Date.now() - e.at < MAX_AGE_MS) : [];
   } catch {
     return [];
   }
 };
 const writePending = (p: Pending[]) => {
   try {
-    localStorage.setItem(PENDING_KEY, JSON.stringify(p.slice(-30)));
+    localStorage.setItem(PENDING_KEY, JSON.stringify(p.slice(-MAX_PENDING)));
   } catch {
-    /* ignore */
+    /* storage full: drop the oldest and try once more */
+    try {
+      localStorage.setItem(PENDING_KEY, JSON.stringify(p.slice(-3)));
+    } catch {
+      /* ignore */
+    }
   }
 };
 
 async function submitRemote(e: Pending): Promise<void> {
-  await api('/api/score', {
-    method: 'POST',
-    body: JSON.stringify({ clientId: clientId(), name: e.name, world: e.world, seed: e.seed, lapMs: Math.round(e.lapMs), totalMs: Math.round(e.totalMs) }),
-  });
+  await api('/api/score', { method: 'POST', body: JSON.stringify({ clientId: clientId(), name: e.name, replay: e.replay }) });
 }
 
-/** Retry anything that failed earlier (offline, 5xx). Rejections by the server (4xx) are dropped. */
-export async function flushPending(): Promise<void> {
-  if (!globalEnabled()) return;
-  const queue = readPending();
-  const keep: Pending[] = [];
-  for (const e of queue) {
-    try {
-      await submitRemote(e);
-    } catch (err) {
-      const code = parseInt((err as Error).message, 10);
-      if (!(code >= 400 && code < 500)) keep.push(e);
+/** Network failures, 5xx and 429 (throttled) are worth retrying; any other 4xx means the server rejected it for good. */
+export function isRetryable(err: unknown): boolean {
+  const code = parseInt((err as Error)?.message, 10);
+  return !(code >= 400 && code < 500 && code !== 429);
+}
+
+let flushing: Promise<void> | null = null;
+
+/** Send everything queued. Safe to call from several places at once. */
+export function flushPending(): Promise<void> {
+  if (!globalEnabled()) return Promise.resolve();
+  if (flushing) return flushing;
+  // With an empty queue the async body below finishes synchronously, so the lock has to be released from a
+  // callback attached *after* `flushing` is assigned (a `finally` inside the body would run too early and
+  // leave a stale, already-resolved promise in `flushing` forever).
+  const run = (async () => {
+    const queue = readPending();
+    const keep: Pending[] = [];
+    let blocked = false;
+    for (const e of queue) {
+      if (blocked) {
+        keep.push(e);
+        continue;
+      }
+      try {
+        await submitRemote(e);
+      } catch (err) {
+        if (isRetryable(err)) {
+          keep.push(e);
+          blocked = true; // offline or throttled: stop and try again later, preserving order
+        }
+      }
     }
-  }
-  writePending(keep);
+    // keep entries queued while we were sending
+    const sent = new Set(queue.map((q) => q.id));
+    writePending([...keep, ...readPending().filter((q) => !sent.has(q.id))]);
+  })();
+  flushing = run;
+  const release = () => {
+    if (flushing === run) flushing = null;
+  };
+  run.then(release, release);
+  return run;
+}
+
+/** Retry when the browser comes back online. */
+export function watchConnectivity(): () => void {
+  if (typeof window === 'undefined') return () => {};
+  const on = () => void flushPending();
+  window.addEventListener('online', on);
+  return () => window.removeEventListener('online', on);
 }
 
 /** Your own best lap on a track, from this device. */
@@ -132,7 +168,11 @@ export function bestLocalLap(world: number, seed: number): number | null {
   return laps.length ? Math.min(...laps) : null;
 }
 
-export async function saveScore(e: Omit<ScoreEntry, 'you' | 'at'>): Promise<void> {
+/**
+ * Local records are kept for every run. Only time trials that carry an input replay go to the global board, where
+ * the server re-simulates them (see api/score.ts).
+ */
+export async function saveScore(e: Omit<ScoreEntry, 'you' | 'at'>, replay?: Replay): Promise<void> {
   const all = loadLocal();
   all.push({ ...e, you: true, at: Date.now() });
   try {
@@ -140,8 +180,8 @@ export async function saveScore(e: Omit<ScoreEntry, 'you' | 'at'>): Promise<void
   } catch {
     /* ignore */
   }
-  if (!globalEnabled()) return;
-  writePending([...readPending(), { name: e.name, lapMs: e.lapMs, totalMs: e.totalMs, world: e.world, seed: e.seed }]);
+  if (!globalEnabled() || !replay) return;
+  writePending([...readPending(), { id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, name: e.name, replay, at: Date.now() }]);
   await flushPending();
 }
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, Dices, Link2, Lock, Play, Smartphone, Trophy, Volume2, VolumeX } from 'lucide-react';
+import { Check, Dices, Link2, Lock, Play, Settings, Trophy, Volume2, VolumeX } from 'lucide-react';
 import { KARTS, type Mode } from '../game/karts';
 import KartPreview from './KartPreview';
 import { WORLDS } from '../game/worlds';
@@ -7,7 +7,6 @@ import type { Progress } from '../utils/progress';
 import { bestLocalLap } from '../utils/leaderboard';
 import { dailyDone, dailyStreak, formatCountdown, isDaily, msUntilNextDaily, type Daily } from '../utils/daily';
 import { formatTime } from '../utils/format';
-import { hapticsSupported } from '../utils/haptics';
 import { randomSeed } from '../utils/rng';
 import { challengeUrl, copyText } from '../utils/share';
 
@@ -20,8 +19,6 @@ interface Props {
   onDaily: () => void;
   progress: Progress;
   muted: boolean;
-  haptics: boolean;
-  onHaptics: () => void;
   mode: Mode;
   onMode: (m: Mode) => void;
   kart: string;
@@ -31,6 +28,7 @@ interface Props {
   onRace: () => void;
   onBoard: () => void;
   onMute: () => void;
+  onSettings: () => void;
 }
 
 const DIFF_COLOR = ['bg-apple-green/20 text-apple-green', 'bg-apple-yellow/20 text-apple-yellow', 'bg-apple-pink/20 text-apple-pink'];
@@ -57,11 +55,9 @@ export default function Menu(p: Props) {
         <div className="flex items-center justify-between">
           <span className="rounded-pill bg-glass px-3 py-1 text-xs font-medium tracking-wide text-white/70">v1 · ARCADE</span>
           <div className="flex gap-2">
-          {hapticsSupported() && (
-            <button aria-label={p.haptics ? 'Turn haptics off' : 'Turn haptics on'} aria-pressed={p.haptics} onClick={p.onHaptics} className={`glass flex h-10 w-10 items-center justify-center !rounded-pill active:scale-95 ${p.haptics ? '' : 'opacity-50'}`}>
-              <Smartphone size={18} />
-            </button>
-          )}
+          <button aria-label="Settings" onClick={p.onSettings} className="glass flex h-10 w-10 items-center justify-center !rounded-pill active:scale-95">
+            <Settings size={18} />
+          </button>
           <button aria-label={p.muted ? 'Unmute' : 'Mute'} onClick={p.onMute} className="glass flex h-10 w-10 items-center justify-center !rounded-pill active:scale-95">
             {p.muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
           </button>

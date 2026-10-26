@@ -84,7 +84,7 @@ export default function LeaderboardModal({ world, seed, last, onClose }: Props) 
           {board && rows.length === 0 && <li className="py-8 text-center text-white/50">No times yet — be the first!</li>}
         </ol>
         <p className="px-5 pt-2 text-[11px] text-white/40">
-          {board?.source === 'global' && 'Global board · best lap per player'}
+          {board?.source === 'global' && 'Global board · server-verified time trials, best lap per player'}
           {board?.source === 'offline' && 'Can’t reach the global board — showing your times with rival ghosts'}
           {board?.source === 'local' && 'Local board with rival ghosts'}
           {best >= 0 ? ` · you’re #${best + 1}` : ''}

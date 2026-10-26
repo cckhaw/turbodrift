@@ -1,4 +1,4 @@
-import type { WorldConfig } from '../game/types';
+import type { WorldConfig } from '../game/types.js';
 
 /** Tiny Web Audio synthesizer: engine, drift hiss, SFX and a procedural synthwave loop. No audio files. */
 class Synth {
@@ -34,15 +34,27 @@ class Synth {
     this.master.gain.value = this.muted ? 0 : 0.8;
     this.master.connect(ctx.destination);
     this.sfxBus = ctx.createGain();
-    this.sfxBus.gain.value = 0.7;
+    this.sfxBus.gain.value = this.sfxVol * 0.875;
     this.sfxBus.connect(this.master);
     this.musicBus = ctx.createGain();
-    this.musicBus.gain.value = 0.32;
+    this.musicBus.gain.value = this.musicVol * 0.45;
     this.musicBus.connect(this.master);
     const len = ctx.sampleRate * 1.5;
     this.noise = ctx.createBuffer(1, len, ctx.sampleRate);
     const d = this.noise.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  }
+
+  private musicVol = 0.7;
+  private sfxVol = 0.8;
+
+  /** Apply the player's volume settings (0..1). Safe to call before init(). */
+  setVolumes(music: number, sfx: number): void {
+    this.musicVol = music;
+    this.sfxVol = sfx;
+    if (!this.ctx) return;
+    this.musicBus.gain.setTargetAtTime(music * 0.45, this.ctx.currentTime, 0.05);
+    this.sfxBus.gain.setTargetAtTime(sfx * 0.875, this.ctx.currentTime, 0.05);
   }
 
   setMuted(m: boolean): void {

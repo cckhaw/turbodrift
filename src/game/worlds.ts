@@ -1,4 +1,4 @@
-import type { WorldConfig } from './types';
+import type { WorldConfig } from './types.js';
 
 export const SEG_LENGTH = 200;
 export const LAPS = 3;

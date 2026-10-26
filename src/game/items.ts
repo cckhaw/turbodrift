@@ -1,4 +1,4 @@
-import type { Rng } from '../utils/rng';
+import type { Rng } from '../utils/rng.js';
 
 export type Item = 'turbo' | 'shield' | 'oil' | 'missile';
 

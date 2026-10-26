@@ -3,13 +3,14 @@ import Menu from './components/Menu';
 import RaceScreen from './components/RaceScreen';
 import Results from './components/Results';
 import LeaderboardModal from './components/LeaderboardModal';
+import SettingsModal from './components/SettingsModal';
 import { synth } from './audio/synth';
 import { dailyFor, isDaily as isDailyTrack, recordDaily } from './utils/daily';
 import { loadKart, loadMode, saveKart, saveMode, type Mode } from './game/karts';
 import { WORLDS } from './game/worlds';
 import type { RaceResult } from './game/types';
-import { flushPending, getPlayerName, saveScore } from './utils/leaderboard';
-import { hapticsEnabled, setHaptics } from './utils/haptics';
+import { flushPending, getPlayerName, saveScore, watchConnectivity } from './utils/leaderboard';
+import { syncCloud } from './utils/cloud';
 import { loadProgress, recordFinish, type Progress } from './utils/progress';
 import { randomSeed } from './utils/rng';
 
@@ -44,14 +45,19 @@ export default function App() {
   const [unlock, setUnlock] = useState<number | null>(null);
   const [board, setBoard] = useState(false);
   const [muted, setMuted] = useState(false);
-  const [haptics, setHapticsState] = useState(hapticsEnabled);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [mode, setModeState] = useState<Mode>(loadMode);
   const [kart, setKartState] = useState(() => loadKart().id);
 
   useEffect(() => {
     void flushPending();
+    void syncCloud().then((p) => p && setProgress(p));
+    const stopWatching = watchConnectivity();
     const t = window.setInterval(() => setDaily(dailyFor()), 60000); // roll over at UTC midnight
-    return () => window.clearInterval(t);
+    return () => {
+      window.clearInterval(t);
+      stopWatching();
+    };
   }, []);
 
   const pickWorld = (w: number) => {
@@ -83,7 +89,8 @@ export default function App() {
       recordDaily(dailyFor().date);
       setDailyTick((n) => n + 1);
     }
-    void saveScore({ name: getPlayerName(), lapMs: r.bestLap, totalMs: r.totalTime, world: r.world, seed: r.seed });
+    void syncCloud().then((p) => p && setProgress(p));
+    void saveScore({ name: getPlayerName(), lapMs: r.bestLap, totalMs: r.totalTime, world: r.world, seed: r.seed }, r.replay);
     setResult(r);
     setScreen('results');
   }, []);
@@ -123,11 +130,7 @@ export default function App() {
             saveKart(k);
             setKartState(k);
           }}
-          haptics={haptics}
-          onHaptics={() => {
-            setHaptics(!haptics);
-            setHapticsState(!haptics);
-          }}
+          onSettings={() => setSettingsOpen(true)}
           onWorld={pickWorld}
           onSeed={pickSeed}
           onRace={race}
@@ -139,7 +142,7 @@ export default function App() {
           }}
         />
       )}
-      {screen !== 'menu' && <RaceScreen key={runId} world={world} seed={seed} mode={mode} kart={kart} onFinish={finish} onQuit={quit} />}
+      {screen !== 'menu' && <RaceScreen key={runId} world={world} seed={seed} mode={mode} kart={kart} onFinish={finish} onQuit={quit} onSettings={() => setSettingsOpen(true)} />}
       {screen === 'results' && result && (
         <Results
           result={result}
@@ -160,6 +163,18 @@ export default function App() {
                 }
               : null
           }
+        />
+      )}
+      {settingsOpen && (
+        <SettingsModal
+          muted={muted}
+          onMute={() => {
+            synth.init();
+            synth.setMuted(!muted);
+            setMuted(!muted);
+          }}
+          onProgress={setProgress}
+          onClose={() => setSettingsOpen(false)}
         />
       )}
       {board && <LeaderboardModal world={world} seed={seed} last={result} onClose={() => setBoard(false)} />}
