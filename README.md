@@ -27,13 +27,11 @@ npm run build
 ## Challenge seeds & leaderboard
 `?world=2&seed=98765` rebuilds the identical track (`src/utils/rng.ts`, mulberry32). "Share Scorecard" copies an emoji race matrix and the challenge link.
 
-**Global leaderboard (Supabase).**
-1. Create a Supabase project and run `supabase/migrations/001_scores.sql` in the SQL editor.
-2. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (see `.env.example`; on Vercel add them as Production env vars).
+**Global leaderboard (Neon Postgres).** Two Vercel Functions (`api/score.ts`, `api/leaderboard.ts`) talk to Neon through `@neondatabase/serverless` using the `DATABASE_URL` that the Neon integration injects. The `scores` table is created automatically on the first request (`db/schema.sql` is a reference copy). The browser never sees database credentials.
 
-How it is protected: the browser can only read the `leaderboard` view and call `submit_score`. It has no direct table access, so scores can't be edited or deleted. `submit_score` rejects lap times faster than a per-world physical limit (`world_limits`), sanitises the name, and keeps one row per device/world/seed that only ever improves. This stops casual tampering, not a determined cheater: times are reported by the client and there is no server-side replay check or rate limit.
+The API rejects lap times faster than a per-world physical limit, sanitises names, keeps one row per device/world/seed that only ever improves, and throttles a device to one submission per 45 s. This stops casual tampering, not a determined cheater: times are reported by the client and there is no server-side replay check.
 
-Without the env vars (or when offline) the board falls back to `localStorage` plus deterministic rival ghosts, and failed submissions are retried on the next launch.
+When the API is unreachable (or in `npm run dev`, unless `VITE_API_BASE` points at a deployed API) the board falls back to `localStorage` plus deterministic rival ghosts, and failed submissions are retried on the next launch.
 
 ## Deployment: production only, latest only
 - `vercel.json` skips every build that is not on `main` (`ignoreCommand`), so **preview deployments are never created**.

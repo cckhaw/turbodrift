@@ -16,14 +16,14 @@ export interface Board {
   source: 'global' | 'offline' | 'local';
 }
 
-export const globalEnabled = (): boolean => Boolean(SB_URL && SB_KEY);
+export const globalEnabled = (): boolean => import.meta.env.PROD || Boolean(API);
 
 const KEY = 'turbodrift.scores.v1';
 const NAME_KEY = 'turbodrift.name';
 const CLIENT_KEY = 'turbodrift.client';
 const PENDING_KEY = 'turbodrift.pending.v1';
-const SB_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const SB_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+/** Same-origin Vercel functions in production; set VITE_API_BASE to hit a deployed API from `npm run dev`. */
+const API = (import.meta.env.VITE_API_BASE as string | undefined) ?? '';
 
 const GHOSTS = ['VoltRunner', 'NightDrift', 'PixelRacer', 'ApexKid', 'SynthWolf', 'RubberBurn', 'HaloGT', 'Kira-9', 'TurboToast', 'LaserLine', 'Zenith', 'DriftMonk', 'Hyperion', 'MochiMax'];
 
@@ -74,15 +74,11 @@ const clientId = (): string => {
   }
 };
 
-async function sb(path: string, init: RequestInit = {}): Promise<Response> {
+async function api(path: string, init: RequestInit = {}): Promise<Response> {
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), 6000);
   try {
-    const res = await fetch(`${SB_URL}${path}`, {
-      ...init,
-      signal: ctl.signal,
-      headers: { apikey: SB_KEY!, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json', ...init.headers },
-    });
+    const res = await fetch(`${API}${path}`, { ...init, signal: ctl.signal, headers: { 'Content-Type': 'application/json', ...init.headers } });
     if (!res.ok) throw new Error(`${res.status}`);
     return res;
   } finally {
@@ -108,9 +104,9 @@ const writePending = (p: Pending[]) => {
 };
 
 async function submitRemote(e: Pending): Promise<void> {
-  await sb('/rest/v1/rpc/submit_score', {
+  await api('/api/score', {
     method: 'POST',
-    body: JSON.stringify({ p_client: clientId(), p_name: e.name, p_world: e.world, p_seed: e.seed, p_lap_ms: Math.round(e.lapMs), p_total_ms: Math.round(e.totalMs) }),
+    body: JSON.stringify({ clientId: clientId(), name: e.name, world: e.world, seed: e.seed, lapMs: Math.round(e.lapMs), totalMs: Math.round(e.totalMs) }),
   });
 }
 
@@ -144,8 +140,7 @@ export async function saveScore(e: Omit<ScoreEntry, 'you' | 'at'>): Promise<void
 }
 
 async function fetchGlobal(world: number, seed: number | null): Promise<ScoreEntry[]> {
-  const q = `world=eq.${world}${seed != null ? `&seed=eq.${seed}` : ''}&order=lap_ms.asc&limit=25&select=name,lap_ms,total_ms,world,seed`;
-  const rows = (await (await sb(`/rest/v1/leaderboard?${q}`)).json()) as { name: string; lap_ms: number; total_ms: number; world: number; seed: number }[];
+  const rows = (await (await api(`/api/leaderboard?world=${world}${seed != null ? `&seed=${seed}` : ''}`)).json()) as { name: string; lap_ms: number; total_ms: number; world: number; seed: number }[];
   return rows.map((r) => ({ name: r.name, lapMs: r.lap_ms, totalMs: r.total_ms, world: r.world, seed: r.seed }));
 }
 
