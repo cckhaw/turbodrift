@@ -120,33 +120,38 @@ let flushing: Promise<void> | null = null;
 /** Send everything queued. Safe to call from several places at once. */
 export function flushPending(): Promise<void> {
   if (!globalEnabled()) return Promise.resolve();
-  flushing ??= (async () => {
-    try {
-      const queue = readPending();
-      const keep: Pending[] = [];
-      let blocked = false;
-      for (const e of queue) {
-        if (blocked) {
+  if (flushing) return flushing;
+  // With an empty queue the async body below finishes synchronously, so the lock has to be released from a
+  // callback attached *after* `flushing` is assigned (a `finally` inside the body would run too early and
+  // leave a stale, already-resolved promise in `flushing` forever).
+  const run = (async () => {
+    const queue = readPending();
+    const keep: Pending[] = [];
+    let blocked = false;
+    for (const e of queue) {
+      if (blocked) {
+        keep.push(e);
+        continue;
+      }
+      try {
+        await submitRemote(e);
+      } catch (err) {
+        if (isRetryable(err)) {
           keep.push(e);
-          continue;
-        }
-        try {
-          await submitRemote(e);
-        } catch (err) {
-          if (isRetryable(err)) {
-            keep.push(e);
-            blocked = true; // offline or throttled: stop and try again later, preserving order
-          }
+          blocked = true; // offline or throttled: stop and try again later, preserving order
         }
       }
-      // keep entries queued while we were sending
-      const sent = new Set(queue.map((q) => q.id));
-      writePending([...keep, ...readPending().filter((q) => !sent.has(q.id))]);
-    } finally {
-      flushing = null;
     }
+    // keep entries queued while we were sending
+    const sent = new Set(queue.map((q) => q.id));
+    writePending([...keep, ...readPending().filter((q) => !sent.has(q.id))]);
   })();
-  return flushing;
+  flushing = run;
+  const release = () => {
+    if (flushing === run) flushing = null;
+  };
+  run.then(release, release);
+  return run;
 }
 
 /** Retry when the browser comes back online. */

@@ -93,6 +93,20 @@ describe('score submission queue', () => {
     expect(queued()).toHaveLength(0);
   });
 
+  it('regression: an empty-queue flush at app start must not block later submissions', async () => {
+    const L = await load();
+    await L.flushPending(); // what App does on launch, with nothing queued
+    await L.flushPending();
+    await L.saveScore(entry, replay); // the player finishes a time trial
+    expect(calls).toHaveLength(1);
+    expect(queued()).toHaveLength(0);
+    responses = ['network'];
+    await L.saveScore({ ...entry, name: 'B' }, replay);
+    expect(queued()).toHaveLength(1);
+    await L.flushPending();
+    expect(queued()).toHaveLength(0);
+  });
+
   it('concurrent flushes send each entry once', async () => {
     const L = await load();
     responses = ['network'];
