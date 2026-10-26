@@ -16,6 +16,7 @@ CI (`.github/workflows/ci.yml`) runs typecheck, tests and build on every PR and 
 - Drive through the spinning **?** boxes (race mode) to get an item and tap the item button (or `E`): 🚀 turbo, 🛡️ shield, 🛢️ oil slick, 🎯 homing missile. Items rubber-band: leaders get defence, the back of the pack gets turbos and missiles. Bots use items too.
 - **Karts:** Comet (balanced), Rocket (fast, heavy), Phantom (nimble, charges drifts quickly).
 - **Time Trial:** solo run with no bots or items against your best-lap ghost; lap times still go to the leaderboard.
+- **Daily challenge:** one shared track per UTC day (world rotates, seed from the date), played as a time trial. Because everyone gets the same seed, the leaderboard for that seed is the daily board. Streak counter (🔥) for consecutive days.
 - Yellow chevrons are boost pads. Wind gates (world 2) and blocks (world 3) slow you down. On sky/lava tracks, leaving the road means a fall.
 - 3 laps against 5 bots. Finish top 3 to unlock the next world.
 

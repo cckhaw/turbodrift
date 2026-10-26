@@ -4,6 +4,7 @@ import RaceScreen from './components/RaceScreen';
 import Results from './components/Results';
 import LeaderboardModal from './components/LeaderboardModal';
 import { synth } from './audio/synth';
+import { dailyFor, isDaily as isDailyTrack, recordDaily } from './utils/daily';
 import { loadKart, loadMode, saveKart, saveMode, type Mode } from './game/karts';
 import { WORLDS } from './game/worlds';
 import type { RaceResult } from './game/types';
@@ -35,6 +36,8 @@ export default function App() {
   const [world, setWorld] = useState(initial.world);
   const [seed, setSeed] = useState(initial.seed);
   const [fromLink, setFromLink] = useState(initial.link);
+  const [daily, setDaily] = useState(() => dailyFor());
+  const [dailyTick, setDailyTick] = useState(0);
   const [runId, setRunId] = useState(0);
   const [progress, setProgress] = useState<Progress>(loadProgress);
   const [result, setResult] = useState<RaceResult | null>(null);
@@ -47,6 +50,8 @@ export default function App() {
 
   useEffect(() => {
     void flushPending();
+    const t = window.setInterval(() => setDaily(dailyFor()), 60000); // roll over at UTC midnight
+    return () => window.clearInterval(t);
   }, []);
 
   const pickWorld = (w: number) => {
@@ -74,6 +79,10 @@ export default function App() {
       setProgress(next);
       setUnlock(next.unlocked > before ? next.unlocked : null);
     }
+    if (isDailyTrack(dailyFor(), r.world, r.seed)) {
+      recordDaily(dailyFor().date);
+      setDailyTick((n) => n + 1);
+    }
     void saveScore({ name: getPlayerName(), lapMs: r.bestLap, totalMs: r.totalTime, world: r.world, seed: r.seed });
     setResult(r);
     setScreen('results');
@@ -91,6 +100,17 @@ export default function App() {
           world={world}
           seed={seed}
           fromLink={fromLink}
+          daily={daily}
+          dailyTick={dailyTick}
+          onDaily={() => {
+            const d = dailyFor();
+            setWorld(d.world);
+            setSeed(d.seed);
+            setFromLink(true);
+            saveMode('trial');
+            setModeState('trial');
+            syncUrl(d.world, d.seed);
+          }}
           progress={progress}
           muted={muted}
           mode={mode}

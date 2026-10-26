@@ -4,6 +4,9 @@ import { KARTS, type Mode } from '../game/karts';
 import KartPreview from './KartPreview';
 import { WORLDS } from '../game/worlds';
 import type { Progress } from '../utils/progress';
+import { bestLocalLap } from '../utils/leaderboard';
+import { dailyDone, dailyStreak, formatCountdown, isDaily, msUntilNextDaily, type Daily } from '../utils/daily';
+import { formatTime } from '../utils/format';
 import { hapticsSupported } from '../utils/haptics';
 import { randomSeed } from '../utils/rng';
 import { challengeUrl, copyText } from '../utils/share';
@@ -12,6 +15,9 @@ interface Props {
   world: number;
   seed: number;
   fromLink: boolean;
+  daily: Daily;
+  dailyTick: number;
+  onDaily: () => void;
   progress: Progress;
   muted: boolean;
   haptics: boolean;
@@ -68,7 +74,30 @@ export default function Menu(p: Props) {
           <p className="mt-3 text-[15px] text-white/60">Drift. Boost. Beat five rival bots in 3 laps.</p>
         </header>
 
-        {p.fromLink && (
+        {(() => {
+          void p.dailyTick;
+          const dw = WORLDS[p.daily.world - 1];
+          const best = bestLocalLap(p.daily.world, p.daily.seed);
+          const streak = dailyStreak();
+          const active = isDaily(p.daily, p.world, p.seed);
+          return (
+            <button onClick={p.onDaily} className={`glass mt-5 flex w-full items-center gap-3 p-4 text-left transition active:scale-[0.98] ${active ? 'ring-2 ring-apple-pink shadow-neon-pink' : ''}`}>
+              <span className="text-3xl">{dailyDone(p.daily.date) ? '✅' : '📅'}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-xs font-semibold uppercase tracking-widest text-apple-pink">Daily challenge</span>
+                <span className="block truncate font-semibold">
+                  {dw.emoji} {dw.name} · time trial
+                </span>
+                <span className="block text-xs text-white/55">
+                  {best != null ? `Your best ${formatTime(best)}` : 'Set a lap time'} · resets in {formatCountdown(msUntilNextDaily())}
+                </span>
+              </span>
+              {streak > 0 && <span className="shrink-0 rounded-pill bg-apple-yellow/20 px-2.5 py-1 text-xs font-bold text-apple-yellow">🔥 {streak}</span>}
+            </button>
+          );
+        })()}
+
+        {p.fromLink && !isDaily(p.daily, p.world, p.seed) && (
           <div className="glass mt-5 flex items-center gap-2 px-4 py-3 text-sm">
             <Link2 size={16} className="text-apple-blue" />
             <span>
