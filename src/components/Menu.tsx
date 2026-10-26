@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Check, Dices, Link2, Lock, Play, Smartphone, Trophy, Volume2, VolumeX } from 'lucide-react';
 import { KARTS, type Mode } from '../game/karts';
+import KartPreview from './KartPreview';
 import { WORLDS } from '../game/worlds';
 import type { Progress } from '../utils/progress';
 import { hapticsSupported } from '../utils/haptics';
@@ -117,7 +118,7 @@ export default function Menu(p: Props) {
                 aria-pressed={p.kart === k.id}
                 className={`rounded-2xl border p-2.5 text-left transition active:scale-95 ${p.kart === k.id ? 'border-apple-blue bg-apple-blue/20' : 'border-glass-border bg-white/[0.04]'}`}
               >
-                <span className="mb-1.5 block h-1.5 w-full rounded-pill" style={{ background: `linear-gradient(90deg, ${k.color}, ${k.accent})` }} />
+                <KartPreview kart={k} />
                 <span className="block text-sm font-semibold">{k.name}</span>
                 {([['SPD', k.speed], ['ACC', k.accel], ['TURN', k.handling], ['DRIFT', k.drift]] as const).map(([l, v]) => (
                   <span key={l} className="mt-1 flex items-center gap-1 text-[9px] font-semibold tracking-wider text-white/45">

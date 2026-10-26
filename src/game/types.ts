@@ -69,6 +69,7 @@ export interface Car {
   lap: number;
   steerVis: number;
   ghost?: boolean;
+  shape?: 'comet' | 'rocket' | 'phantom';
   item: Item | null;
   itemT: number; // bots: seconds until they use the held item
   shieldT: number;
