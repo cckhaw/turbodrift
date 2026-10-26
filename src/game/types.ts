@@ -1,4 +1,6 @@
 export type SceneryKind = 'tower' | 'sign' | 'pylon' | 'cloud' | 'island' | 'rock' | 'lavaPillar' | 'crystal';
+import type { Item } from './items';
+
 export type HazardKind = 'wind' | 'block';
 
 export interface Scenery {
@@ -22,6 +24,12 @@ export interface Pad {
   width: number;
 }
 
+export interface Prop {
+  kind: 'oil' | 'missile';
+  x: number;
+  pct: number; // position inside the segment
+}
+
 export interface Point {
   world: { y: number; z: number };
   camera: { x: number; y: number; z: number };
@@ -36,11 +44,13 @@ export interface Segment {
   scenery: Scenery[];
   hazard?: Hazard;
   pad?: Pad;
+  boxes?: number[];
   finish: boolean;
   looped: boolean;
   fog: number;
   clip: number;
   cars: Car[];
+  props: Prop[];
 }
 
 export interface Car {
@@ -59,6 +69,11 @@ export interface Car {
   lap: number;
   steerVis: number;
   ghost?: boolean;
+  item: Item | null;
+  itemT: number; // bots: seconds until they use the held item
+  shieldT: number;
+  spinT: number;
+  boostT: number; // bots only
 }
 
 export interface Track {
@@ -121,9 +136,14 @@ export interface HudSnapshot {
   standings: { name: string; color: string; you: boolean; gap: number }[];
   toast: { text: string; id: number } | null;
   fallen: boolean;
+  item: Item | null;
+  itemRolling: boolean;
+  shield: boolean;
 }
 
 export interface RaceResult {
+  mode: 'race' | 'trial';
+  kart: string;
   world: number;
   seed: number;
   position: number;

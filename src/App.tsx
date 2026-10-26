@@ -4,6 +4,7 @@ import RaceScreen from './components/RaceScreen';
 import Results from './components/Results';
 import LeaderboardModal from './components/LeaderboardModal';
 import { synth } from './audio/synth';
+import { loadKart, loadMode, saveKart, saveMode, type Mode } from './game/karts';
 import { WORLDS } from './game/worlds';
 import type { RaceResult } from './game/types';
 import { flushPending, getPlayerName, saveScore } from './utils/leaderboard';
@@ -41,6 +42,8 @@ export default function App() {
   const [board, setBoard] = useState(false);
   const [muted, setMuted] = useState(false);
   const [haptics, setHapticsState] = useState(hapticsEnabled);
+  const [mode, setModeState] = useState<Mode>(loadMode);
+  const [kart, setKartState] = useState(() => loadKart().id);
 
   useEffect(() => {
     void flushPending();
@@ -66,9 +69,11 @@ export default function App() {
 
   const finish = useCallback((r: RaceResult) => {
     const before = loadProgress().unlocked;
-    const next = recordFinish(r.world, r.position);
-    setProgress(next);
-    setUnlock(next.unlocked > before ? next.unlocked : null);
+    if (r.mode === 'race') {
+      const next = recordFinish(r.world, r.position);
+      setProgress(next);
+      setUnlock(next.unlocked > before ? next.unlocked : null);
+    }
     void saveScore({ name: getPlayerName(), lapMs: r.bestLap, totalMs: r.totalTime, world: r.world, seed: r.seed });
     setResult(r);
     setScreen('results');
@@ -88,6 +93,16 @@ export default function App() {
           fromLink={fromLink}
           progress={progress}
           muted={muted}
+          mode={mode}
+          onMode={(m) => {
+            saveMode(m);
+            setModeState(m);
+          }}
+          kart={kart}
+          onKart={(k) => {
+            saveKart(k);
+            setKartState(k);
+          }}
           haptics={haptics}
           onHaptics={() => {
             setHaptics(!haptics);
@@ -104,7 +119,7 @@ export default function App() {
           }}
         />
       )}
-      {screen !== 'menu' && <RaceScreen key={runId} world={world} seed={seed} onFinish={finish} onQuit={quit} />}
+      {screen !== 'menu' && <RaceScreen key={runId} world={world} seed={seed} mode={mode} kart={kart} onFinish={finish} onQuit={quit} />}
       {screen === 'results' && result && (
         <Results
           result={result}
@@ -113,7 +128,7 @@ export default function App() {
           onMenu={quit}
           onBoard={() => setBoard(true)}
           onNext={
-            result.position <= 3 && world < WORLDS.length
+            result.mode === 'race' && result.position <= 3 && world < WORLDS.length
               ? () => {
                   const w = world + 1;
                   const s = randomSeed();

@@ -14,6 +14,15 @@ export function challengeUrl(world: number, seed: number): string {
 /** Emoji race matrix: one row per lap, ⬜ = karts ahead, 🟦 = you, ⬛ = karts behind. */
 export function scorecardText(r: RaceResult): string {
   const w = WORLDS[r.world - 1];
+  if (r.mode === 'trial') {
+    return [
+      '⏱️ Turbo Drift: Neon Circuit · Time Trial',
+      `${w.emoji} ${w.name} · Seed ${r.seed}`,
+      `${formatTime(r.totalTime)} · Best lap ${formatTime(r.bestLap)}`,
+      ...r.lapTimes.map((t, i) => `L${i + 1} ${formatTime(t)}`),
+      `Beat my lap 👉 ${challengeUrl(r.world, r.seed)}`,
+    ].join('\n');
+  }
   const rows = r.lapPositions.map((p, i) => {
     const cells = Array.from({ length: r.total }, (_, k) => (k + 1 < p ? '⬜' : k + 1 === p ? (i === r.lapPositions.length - 1 ? '🟥' : '🟦') : '⬛'));
     return `L${i + 1} ${cells.join('')} ${formatTime(r.lapTimes[i])}`;

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Check, Dices, Link2, Lock, Play, Smartphone, Trophy, Volume2, VolumeX } from 'lucide-react';
+import { KARTS, type Mode } from '../game/karts';
 import { WORLDS } from '../game/worlds';
 import type { Progress } from '../utils/progress';
 import { hapticsSupported } from '../utils/haptics';
@@ -14,6 +15,10 @@ interface Props {
   muted: boolean;
   haptics: boolean;
   onHaptics: () => void;
+  mode: Mode;
+  onMode: (m: Mode) => void;
+  kart: string;
+  onKart: (id: string) => void;
   onWorld: (w: number) => void;
   onSeed: (s: number) => void;
   onRace: () => void;
@@ -103,6 +108,32 @@ export default function Menu(p: Props) {
         </section>
 
         <section className="glass mt-4 p-4">
+          <p className="text-sm font-medium text-white/70">Kart</p>
+          <div className="mt-2 grid grid-cols-3 gap-2">
+            {KARTS.map((k) => (
+              <button
+                key={k.id}
+                onClick={() => p.onKart(k.id)}
+                aria-pressed={p.kart === k.id}
+                className={`rounded-2xl border p-2.5 text-left transition active:scale-95 ${p.kart === k.id ? 'border-apple-blue bg-apple-blue/20' : 'border-glass-border bg-white/[0.04]'}`}
+              >
+                <span className="mb-1.5 block h-1.5 w-full rounded-pill" style={{ background: `linear-gradient(90deg, ${k.color}, ${k.accent})` }} />
+                <span className="block text-sm font-semibold">{k.name}</span>
+                {([['SPD', k.speed], ['ACC', k.accel], ['TURN', k.handling], ['DRIFT', k.drift]] as const).map(([l, v]) => (
+                  <span key={l} className="mt-1 flex items-center gap-1 text-[9px] font-semibold tracking-wider text-white/45">
+                    <span className="w-7">{l}</span>
+                    <span className="h-1 flex-1 rounded-pill bg-white/10">
+                      <span className="block h-full rounded-pill bg-white/70" style={{ width: `${Math.min(100, Math.max(15, ((v - 0.8) / 0.6) * 100))}%` }} />
+                    </span>
+                  </span>
+                ))}
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-white/45">{KARTS.find((k) => k.id === p.kart)?.blurb}</p>
+        </section>
+
+        <section className="glass mt-4 p-4">
           <div className="flex items-center justify-between gap-2">
             <label htmlFor="seed" className="text-sm font-medium text-white/70">
               Track seed
@@ -129,9 +160,17 @@ export default function Menu(p: Props) {
           <p className="mt-2 text-xs text-white/45">Same world + seed = same track. Share the link to challenge a friend.</p>
         </section>
 
-        <div className="sticky bottom-0 mt-auto flex gap-3 pt-5">
+        <div className="mt-4 flex rounded-pill bg-black/30 p-1 text-sm font-semibold" role="tablist" aria-label="Mode">
+          {(['race', 'trial'] as const).map((m) => (
+            <button key={m} role="tab" aria-selected={p.mode === m} onClick={() => p.onMode(m)} className={`flex-1 rounded-pill py-2 transition ${p.mode === m ? 'bg-apple-blue text-white' : 'text-white/60'}`}>
+              {m === 'race' ? 'Race · bots + items' : 'Time Trial · solo'}
+            </button>
+          ))}
+        </div>
+
+        <div className="sticky bottom-0 mt-auto flex gap-3 pt-4">
           <button onClick={p.onRace} className="btn-primary flex flex-1 items-center justify-center gap-2 text-lg">
-            <Play size={20} fill="currentColor" /> Race
+            <Play size={20} fill="currentColor" /> {p.mode === 'race' ? 'Race' : 'Start trial'}
           </button>
           <button onClick={p.onBoard} className="btn-glass flex items-center justify-center gap-2">
             <Trophy size={18} /> Board

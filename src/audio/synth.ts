@@ -154,6 +154,14 @@ class Synth {
   pad(): void {
     this.tone(330, 0.35, 'sawtooth', 0.15, 1320);
   }
+  pickup(): void {
+    this.tone(660, 0.12, 'triangle', 0.2, 990);
+    this.tone(990, 0.15, 'triangle', 0.15, 1320, 0.08);
+  }
+  shoot(): void {
+    this.burst(0.3, 2500, 0.25);
+    this.tone(500, 0.3, 'sawtooth', 0.12, 120);
+  }
   bump(): void {
     const now = performance.now();
     if (now - this.lastBump < 200) return;
