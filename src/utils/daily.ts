@@ -26,6 +26,18 @@ export function formatCountdown(ms: number): string {
 
 export const isDaily = (d: Daily, world: number, seed: number): boolean => d.world === world && d.seed === seed;
 
+export function mergeDays(days: string[]): string[] {
+  const merged = Array.from(new Set([...load(), ...days])).sort().slice(-90);
+  try {
+    localStorage.setItem(KEY, JSON.stringify(merged));
+  } catch {
+    /* ignore */
+  }
+  return merged;
+}
+
+export const loadDays = (): string[] => load();
+
 function load(): string[] {
   try {
     const v = JSON.parse(localStorage.getItem(KEY) || '[]');

@@ -15,6 +15,30 @@ export function loadProgress(): Progress {
   return { unlocked: 1, medals: {} };
 }
 
+export function saveProgress(p: Progress): Progress {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(p));
+  } catch {
+    /* ignore */
+  }
+  return p;
+}
+
+/** Progress only moves forward: highest unlock, best finish per world. */
+export function mergeProgress(a: Progress, b: Progress): Progress {
+  const medals: Record<number, number> = { ...a.medals };
+  for (const [k, v] of Object.entries(b.medals)) medals[Number(k)] = Math.min(medals[Number(k)] ?? 99, v);
+  return { unlocked: Math.max(a.unlocked, b.unlocked), medals };
+}
+
+export function resetProgress(): void {
+  try {
+    localStorage.removeItem(KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Podium (top 3) in a world unlocks the next one. */
 export function recordFinish(world: number, place: number): Progress {
   const p = loadProgress();

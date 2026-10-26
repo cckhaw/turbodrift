@@ -14,3 +14,13 @@ create table if not exists scores (
 );
 create index if not exists scores_board_idx on scores (world, seed, lap_ms);
 create index if not exists scores_world_idx on scores (world, lap_ms);
+
+-- cloud save (progress that follows a player via a secret sync code)
+create table if not exists saves (
+  code        text        primary key,
+  data        jsonb       not null,
+  ip_hash     text,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+create index if not exists saves_ip_idx on saves (ip_hash, created_at);

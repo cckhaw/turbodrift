@@ -9,12 +9,6 @@ const noop = new Proxy(function () {}, { get: () => noop, apply: () => noop }) a
 let Engine: typeof EngineType;
 
 beforeAll(async () => {
-  const g = globalThis as Record<string, unknown>;
-  g.window = { devicePixelRatio: 1, innerWidth: 390, innerHeight: 844 };
-  g.ResizeObserver = class {
-    observe() {}
-    disconnect() {}
-  };
   ({ Engine } = await import('../src/game/engine'));
 });
 

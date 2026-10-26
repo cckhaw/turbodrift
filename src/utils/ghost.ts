@@ -1,4 +1,4 @@
-/** Best-lap ghost per world+seed: the player's path sampled every GHOST_DT seconds. */
+/** Best-lap ghost per world+seed+kart (karts differ in speed, so ghosts are only comparable within a kart). */
 export const GHOST_DT = 0.1;
 
 export interface Ghost {
@@ -7,20 +7,20 @@ export interface Ghost {
   x: number[]; // lateral position
 }
 
-const key = (world: number, seed: number) => `turbodrift.ghost.v1.${world}.${seed}`;
+const key = (world: number, seed: number, kart: string) => `turbodrift.ghost.v2.${world}.${seed}.${kart}`;
 
-export function loadGhost(world: number, seed: number): Ghost | null {
+export function loadGhost(world: number, seed: number, kart: string): Ghost | null {
   try {
-    const g = JSON.parse(localStorage.getItem(key(world, seed)) || 'null');
+    const g = JSON.parse(localStorage.getItem(key(world, seed, kart)) || 'null');
     return g && Array.isArray(g.d) && g.d.length > 5 ? g : null;
   } catch {
     return null;
   }
 }
 
-export function saveGhost(world: number, seed: number, g: Ghost): void {
+export function saveGhost(world: number, seed: number, kart: string, g: Ghost): void {
   try {
-    localStorage.setItem(key(world, seed), JSON.stringify({ lapMs: g.lapMs, d: g.d.map(Math.round), x: g.x.map((v) => Math.round(v * 100) / 100) }));
+    localStorage.setItem(key(world, seed, kart), JSON.stringify({ lapMs: g.lapMs, d: g.d.map(Math.round), x: g.x.map((v) => Math.round(v * 100) / 100) }));
   } catch {
     /* storage full or blocked: ghost is a nicety */
   }

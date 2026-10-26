@@ -7,6 +7,7 @@ export type Sql = (strings: TemplateStringsArray, ...values: unknown[]) => Promi
 export const MIN_LAP_MS: Record<number, number> = { 1: 26000, 2: 30000, 3: 32000 };
 const MAX_LAP_MS = 600000;
 const MAX_TOTAL_MS = 3600000;
+const isInt = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** A real race is 3 laps, so one device can't legitimately finish two races this close together. */
 const THROTTLE_SECONDS = 45;
@@ -29,6 +30,14 @@ export function ensureSchema(sql: Sql): Promise<void> {
     )`;
     await sql`create index if not exists scores_board_idx on scores (world, seed, lap_ms)`;
     await sql`create index if not exists scores_world_idx on scores (world, lap_ms)`;
+    await sql`create table if not exists saves (
+      code        text        primary key,
+      data        jsonb       not null,
+      ip_hash     text,
+      created_at  timestamptz not null default now(),
+      updated_at  timestamptz not null default now()
+    )`;
+    await sql`create index if not exists saves_ip_idx on saves (ip_hash, created_at)`;
   })().catch((e) => {
     ready = null; // retry on the next request
     throw e;
@@ -41,18 +50,25 @@ export interface Result {
   body: unknown;
 }
 
-const isInt = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v);
 const bad = (error: string, status = 400): Result => ({ status, body: { error } });
 
-export async function submitScore(sql: Sql, input: unknown): Promise<Result> {
+/** What the verifier must return; see src/game/verify.ts. */
+export type Verifier = (replay: unknown) => { ok: false; error: string } | { ok: true; world: number; seed: number; lapMs: number; totalMs: number; lapTimes: number[] };
+
+/**
+ * The client sends only its identity, name and an input replay. The server re-simulates the race and stores the
+ * times the simulation produced, so a tampered client can't claim a time it didn't drive.
+ */
+export async function submitScore(sql: Sql, input: unknown, verify: Verifier): Promise<Result> {
   const b = (input && typeof input === 'object' ? input : {}) as Record<string, unknown>;
-  const { clientId, world, seed, lapMs, totalMs } = b;
+  const { clientId } = b;
   if (typeof clientId !== 'string' || !UUID.test(clientId)) return bad('bad client id');
-  if (!isInt(world) || !(world in MIN_LAP_MS)) return bad('unknown world');
-  if (!isInt(seed) || seed < 1 || seed > 999999999) return bad('bad seed');
-  if (!isInt(lapMs) || !isInt(totalMs)) return bad('times must be integers');
+
+  const v = verify(b.replay);
+  if (!v.ok) return bad(v.error);
+  const { world, seed, lapMs, totalMs } = v;
   const min = MIN_LAP_MS[world];
-  if (lapMs < min || lapMs > MAX_LAP_MS) return bad('implausible lap time');
+  if (!min || lapMs < min || lapMs > MAX_LAP_MS) return bad('implausible lap time');
   if (totalMs < lapMs + 2 * min || totalMs > MAX_TOTAL_MS) return bad('implausible race time');
   // eslint-disable-next-line no-control-regex
   let name = String(typeof b.name === 'string' ? b.name : '').replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 12);
@@ -69,7 +85,7 @@ export async function submitScore(sql: Sql, input: unknown): Promise<Result> {
           lap_ms = least(scores.lap_ms, excluded.lap_ms),
           total_ms = least(scores.total_ms, excluded.total_ms),
           updated_at = now()`;
-  return { status: 200, body: { ok: true } };
+  return { status: 200, body: { ok: true, lapMs, totalMs } };
 }
 
 export async function getBoard(sql: Sql, worldParam: string | null, seedParam: string | null): Promise<Result> {

@@ -73,6 +73,10 @@ export default function Results({ result: r, newUnlock, onAgain, onMenu, onBoard
         </ol>
         )}
 
+        {!trial && (
+          <p className="mt-3 text-center text-xs text-white/45">Global records come from Time Trial: the server replays your inputs to verify the time.</p>
+        )}
+
         {newUnlock && (
           <p className="mt-3 rounded-2xl bg-apple-green/15 px-4 py-2.5 text-center text-sm font-medium text-apple-green">
             🔓 {WORLDS[newUnlock - 1].name} unlocked!

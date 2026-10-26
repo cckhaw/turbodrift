@@ -1,6 +1,6 @@
-import { Rng } from '../utils/rng';
-import { SEG_LENGTH, WORLDS } from './worlds';
-import type { Hazard, Pad, Scenery, Segment, Track } from './types';
+import { Rng } from '../utils/rng.js';
+import { SEG_LENGTH, WORLDS } from './worlds.js';
+import type { Hazard, Pad, Scenery, Segment, Track } from './types.js';
 
 const ease = (a: number, b: number, p: number) => a + (b - a) * p;
 const easeIn = (a: number, b: number, p: number) => a + (b - a) * p * p;

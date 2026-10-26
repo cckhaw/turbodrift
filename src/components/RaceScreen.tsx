@@ -3,6 +3,7 @@ import { Pause, Play, Flag, Zap } from 'lucide-react';
 import { Engine } from '../game/engine';
 import { ITEM_INFO } from '../game/items';
 import type { Mode } from '../game/karts';
+import { loadSettings } from '../utils/settings';
 import { WORLDS } from '../game/worlds';
 import type { HudSnapshot, RaceResult } from '../game/types';
 import { formatTime } from '../utils/format';
@@ -14,12 +15,12 @@ interface Props {
   kart: string;
   onFinish: (r: RaceResult) => void;
   onQuit: () => void;
+  onSettings: () => void;
 }
 
-const STEER_RANGE = 70; // px of thumb travel for full lock
 const LVL_COLOR = ['#ffffff', '#5AC8FA', '#FF2D55'];
 
-export default function RaceScreen({ world, seed, mode, kart, onFinish, onQuit }: Props) {
+export default function RaceScreen({ world, seed, mode, kart, onFinish, onQuit, onSettings }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<Engine | null>(null);
   const finishRef = useRef(onFinish);
@@ -28,6 +29,7 @@ export default function RaceScreen({ world, seed, mode, kart, onFinish, onQuit }
   const [paused, setPaused] = useState(false);
   const [steerUi, setSteerUi] = useState(0);
   const [driftHeld, setDriftHeld] = useState(false);
+  const steerRange = useRef(loadSettings().steerRange); // px of thumb travel for full lock
   const drag = useRef<{ id: number; origin: number } | null>(null);
   const w = WORLDS[world - 1];
 
@@ -73,6 +75,7 @@ export default function RaceScreen({ world, seed, mode, kart, onFinish, onQuit }
 
   useEffect(() => {
     engineRef.current?.setPaused(paused);
+    steerRange.current = loadSettings().steerRange; // may have been changed from the pause menu
   }, [paused]);
 
   // ---- thumb steering: drag anywhere; the anchor follows the thumb so reversing is instant ----
@@ -89,10 +92,11 @@ export default function RaceScreen({ world, seed, mode, kart, onFinish, onQuit }
     const d = drag.current;
     if (!d || d.id !== e.pointerId) return;
     let dx = e.clientX - d.origin;
-    if (dx > STEER_RANGE) d.origin = e.clientX - STEER_RANGE;
-    if (dx < -STEER_RANGE) d.origin = e.clientX + STEER_RANGE;
+    const range = steerRange.current;
+    if (dx > range) d.origin = e.clientX - range;
+    if (dx < -range) d.origin = e.clientX + range;
     dx = e.clientX - d.origin;
-    const v = Math.abs(dx) < 4 ? 0 : dx / STEER_RANGE;
+    const v = Math.abs(dx) < 4 ? 0 : dx / range;
     setSteer(Math.max(-1, Math.min(1, v)));
   };
   const onUp = (e: React.PointerEvent) => {
@@ -222,6 +226,9 @@ export default function RaceScreen({ world, seed, mode, kart, onFinish, onQuit }
             <h2 className="text-2xl font-bold">Paused</h2>
             <button onClick={() => setPaused(false)} className="btn-primary flex w-full items-center justify-center gap-2">
               <Play size={18} fill="currentColor" /> Resume
+            </button>
+            <button onClick={onSettings} className="btn-glass w-full">
+              Settings
             </button>
             <button onClick={onQuit} className="btn-glass w-full">
               Quit to menu

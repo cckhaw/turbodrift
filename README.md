@@ -5,7 +5,7 @@ Mobile-first arcade kart racer for the browser. React + Vite + Canvas (pseudo-3D
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm test           # vitest: rng, track generation, API (in-memory Postgres), headless full races
+npm test           # vitest: rng, track generation, replay verification, API + cloud save (in-memory Postgres), offline queue, headless full races
 npm run build
 ```
 CI (`.github/workflows/ci.yml`) runs typecheck, tests and build on every PR and on `main`.
@@ -15,7 +15,7 @@ CI (`.github/workflows/ci.yml`) runs typecheck, tests and build on every PR and 
 - **Drift / boost:** hold the DRIFT button (bottom-right, `Space`/`Shift` on desktop) while steering into a turn. Hold until the ring turns blue → pink, release for a mini-turbo. Hard corners in worlds 2–3 are very hard to take without drifting.
 - Drive through the spinning **?** boxes (race mode) to get an item and tap the item button (or `E`): 🚀 turbo, 🛡️ shield, 🛢️ oil slick, 🎯 homing missile. Items rubber-band: leaders get defence, the back of the pack gets turbos and missiles. Bots use items too.
 - **Karts:** Comet (balanced), Rocket (fast, heavy), Phantom (nimble, charges drifts quickly).
-- **Time Trial:** solo run with no bots or items against your best-lap ghost; lap times still go to the leaderboard.
+- **Time Trial:** solo run with no bots or items against your best-lap ghost for that kart. This is the mode whose times go on the global board (verified server-side).
 - **Daily challenge:** one shared track per UTC day (world rotates, seed from the date), played as a time trial. Because everyone gets the same seed, the leaderboard for that seed is the daily board. Streak counter (🔥) for consecutive days.
 - Yellow chevrons are boost pads. Wind gates (world 2) and blocks (world 3) slow you down. On sky/lava tracks, leaving the road means a fall.
 - 3 laps against 5 bots. Finish top 3 to unlock the next world.
@@ -33,11 +33,19 @@ CI (`.github/workflows/ci.yml`) runs typecheck, tests and build on every PR and 
 ## Challenge seeds & leaderboard
 `?world=2&seed=98765` rebuilds the identical track (`src/utils/rng.ts`, mulberry32). "Share Scorecard" copies an emoji race matrix and the challenge link.
 
-**Global leaderboard (Neon Postgres).** Two Vercel Functions (`api/score.ts`, `api/leaderboard.ts`) talk to Neon through `@neondatabase/serverless` using the `DATABASE_URL` that the Neon integration injects. The `scores` table is created automatically on the first request (`db/schema.sql` is a reference copy). The browser never sees database credentials.
+**Global leaderboard (Neon Postgres, server-verified).** Two Vercel Functions (`api/score.ts`, `api/leaderboard.ts`) talk to Neon through `@neondatabase/serverless` using the `DATABASE_URL` that the Neon integration injects. The `scores` table is created automatically on the first request (`db/schema.sql` is a reference copy). The browser never sees database credentials.
 
-The API rejects lap times faster than a per-world physical limit, sanitises names, keeps one row per device/world/seed that only ever improves, and throttles a device to one submission per 45 s. This stops casual tampering, not a determined cheater: times are reported by the client and there is no server-side replay check.
+*Anti-cheat.* The simulation runs at a fixed 60 Hz step, and a Time Trial records the player's inputs (run-length encoded, ~20 KB for a full race). The client submits **only that recording**, never a time. `api/score.ts` re-runs the real game engine headlessly with those inputs (`src/game/verify.ts`) and stores the times *the simulation* produced, so a tampered client can't claim a lap it didn't drive. Races against bots aren't replayable across devices, so the global board is **Time Trial only**; races still count for local records and unlocks. Replays are rejected if malformed, if they don't finish 3 laps, or if the resulting lap is faster than a per-world physical limit; each device is also throttled to one submission per 45 s. Remaining limits: someone could still write a bot that *drives* well (inputs are inputs), and clients could replay a friend's recording under their own name.
 
-When the API is unreachable (or in `npm run dev`, unless `VITE_API_BASE` points at a deployed API) the board falls back to `localStorage` plus deterministic rival ghosts, and failed submissions are retried on the next launch.
+*Offline.* Time trials that can't be submitted (offline, 5xx, throttled) are queued on the device (up to 10, kept 7 days) and retried on launch, when the browser comes back online, and after the next run. Definitive rejections (4xx) are dropped.
+
+*Ghosts* are stored per world + seed + **kart**, so you never race a ghost from a faster kart.
+
+*Cloud save.* World unlocks, medals, daily streak, name and kart can follow you across devices without an account: Settings → Cloud save gives a secret 12-character sync code; entering it on another device restores the save. Merging only ever moves progress forward, so a stale device can't undo unlocks. `api/save.ts` stores it (strictly validated; creation throttled per IP). Anyone with the code can read and update that save, so treat it like a password. Race results themselves aren't verified, so unlock progress is trust-based.
+
+Without the API (or in `npm run dev`, unless `VITE_API_BASE` points at a deployed API) the board falls back to `localStorage` plus deterministic rival ghosts.
+
+**Settings** (gear icon on the menu, or Settings in the pause menu): sound on/off, music and effects volume, steering sensitivity, vibration, battery saver (lower resolution), screen shake, player name, cloud save, and reset progress.
 
 ## Deployment: production only, latest only
 - `vercel.json` skips every build that is not on `main` (`ignoreCommand`), so **preview deployments are never created**.
