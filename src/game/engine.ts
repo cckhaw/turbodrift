@@ -6,6 +6,7 @@ import { loadSettings, type Settings } from '../utils/settings.js';
 import { GHOST_DT, ghostAt, loadGhost, saveGhost, type Ghost } from '../utils/ghost.js';
 import { BOT_COLORS, BOT_NAMES, LAPS, SEG_LENGTH, WORLDS } from './worlds.js';
 import { generateTrack } from './track.js';
+import { lookAhead } from './lookahead.js';
 import { KARTS, kartById, type KartSpec } from './karts.js';
 import { BOX_OFFSETS, BOX_RESPAWN, OIL_LIFE, SHIELD_TIME, SPIN_TIME, rollItem } from './items.js';
 import { drawBackdrop, drawHazard, drawItemBox, drawKart, drawProp, drawScenery, lerp, makeBackdrop, mix, type Backdrop } from './draw.js';
@@ -828,7 +829,17 @@ export class Engine {
       item: p.item,
       itemRolling: this.itemRollT > 0,
       shield: p.shieldT > 0,
+      racers: this.racerMarkers(ranked),
+      ahead: lookAhead(this.track.segments, this.seg(p.dist).index, this.wd.curveMax),
     });
+  }
+
+  /** Where everyone is on the lap, for the track map. */
+  private racerMarkers(ranked: Car[]): HudSnapshot['racers'] {
+    const L = this.track.length;
+    const out: HudSnapshot['racers'] = ranked.map((c, i) => ({ id: c.id, color: c.color, you: c.isPlayer, pos: i + 1, t: mod(c.dist, L) / L }));
+    if (this.ghostCar && this.state === 'racing') out.push({ id: this.ghostCar.id, color: '#ffffff', you: false, pos: 0, t: mod(this.ghostCar.dist, L) / L, ghost: true });
+    return out;
   }
 
   // ---------- rendering ----------

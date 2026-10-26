@@ -81,6 +81,7 @@ export default function App() {
       setOffer(true);
       return;
     }
+    if (mode !== 'practice' && !fromLink && world > progress.unlocked) pickWorld(progress.unlocked);
     synth.init(); // needs a user gesture
     setTutorial(false);
     setResult(null);
@@ -161,6 +162,8 @@ export default function App() {
           onMode={(m) => {
             saveMode(m);
             setModeState(m);
+            // Practice opens every world; leaving it must not strand a locked one for a real race.
+            if (m !== 'practice' && !fromLink && world > progress.unlocked) pickWorld(progress.unlocked);
           }}
           kart={kart}
           onKart={(k) => {
