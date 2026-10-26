@@ -3,7 +3,7 @@ import { Check, Share2, X } from 'lucide-react';
 import { WORLDS } from '../game/worlds';
 import type { RaceResult } from '../game/types';
 import { formatTime } from '../utils/format';
-import { getBoard, getPlayerName, setPlayerName, type ScoreEntry } from '../utils/leaderboard';
+import { getBoard, getPlayerName, setPlayerName, type Board } from '../utils/leaderboard';
 import { challengeUrl, copyText, scorecardText } from '../utils/share';
 
 interface Props {
@@ -15,14 +15,15 @@ interface Props {
 
 export default function LeaderboardModal({ world, seed, last, onClose }: Props) {
   const [tab, setTab] = useState<'seed' | 'world'>('seed');
-  const [rows, setRows] = useState<ScoreEntry[]>([]);
+  const [board, setBoard] = useState<Board | null>(null);
   const [name, setName] = useState(getPlayerName());
   const [copied, setCopied] = useState(false);
   const w = WORLDS[world - 1];
 
   useEffect(() => {
     let live = true;
-    getBoard(world, tab === 'seed' ? seed : null).then((r) => live && setRows(r));
+    setBoard(null);
+    getBoard(world, tab === 'seed' ? seed : null).then((b) => live && setBoard(b));
     return () => {
       live = false;
     };
@@ -44,6 +45,7 @@ export default function LeaderboardModal({ world, seed, last, onClose }: Props) 
     }
   };
 
+  const rows = board?.rows ?? [];
   const best = rows.findIndex((r) => r.you);
 
   return (
@@ -78,9 +80,15 @@ export default function LeaderboardModal({ world, seed, last, onClose }: Props) 
               <span className="font-mono text-sm tabular-nums">{formatTime(r.lapMs)}</span>
             </li>
           ))}
-          {rows.length === 0 && <li className="py-8 text-center text-white/50">Loading…</li>}
+          {!board && <li className="py-8 text-center text-white/50">Loading…</li>}
+          {board && rows.length === 0 && <li className="py-8 text-center text-white/50">No times yet — be the first!</li>}
         </ol>
-        <p className="px-5 pt-2 text-[11px] text-white/40">Best lap time. Rival ghosts fill the board until more players join{best >= 0 ? ` · you’re #${best + 1}` : ''}.</p>
+        <p className="px-5 pt-2 text-[11px] text-white/40">
+          {board?.source === 'global' && 'Global board · best lap per player'}
+          {board?.source === 'offline' && 'Can’t reach the global board — showing your times with rival ghosts'}
+          {board?.source === 'local' && 'Local board with rival ghosts'}
+          {best >= 0 ? ` · you’re #${best + 1}` : ''}
+        </p>
 
         <div className="flex items-center gap-2 p-4">
           <input
