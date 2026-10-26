@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Menu from './components/Menu';
 import RaceScreen from './components/RaceScreen';
 import Results from './components/Results';
@@ -6,7 +6,7 @@ import LeaderboardModal from './components/LeaderboardModal';
 import { synth } from './audio/synth';
 import { WORLDS } from './game/worlds';
 import type { RaceResult } from './game/types';
-import { getPlayerName, saveScore } from './utils/leaderboard';
+import { flushPending, getPlayerName, saveScore } from './utils/leaderboard';
 import { hapticsEnabled, setHaptics } from './utils/haptics';
 import { loadProgress, recordFinish, type Progress } from './utils/progress';
 import { randomSeed } from './utils/rng';
@@ -41,6 +41,10 @@ export default function App() {
   const [board, setBoard] = useState(false);
   const [muted, setMuted] = useState(false);
   const [haptics, setHapticsState] = useState(hapticsEnabled);
+
+  useEffect(() => {
+    void flushPending();
+  }, []);
 
   const pickWorld = (w: number) => {
     setWorld(w);

@@ -25,7 +25,15 @@ npm run build
 `src/game/engine.ts` (`updateBots`): waypoint following along a precomputed racing line (`track.ts`), look-ahead lane changes, corner braking, plus rubber-banding relative to the player (stronger on the final lap) so races stay close.
 
 ## Challenge seeds & leaderboard
-`?world=2&seed=98765` rebuilds the identical track (`src/utils/rng.ts`, mulberry32). The leaderboard is stored in `localStorage` and padded with deterministic rival ghosts. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` to also read/write a Supabase `scores` table (`name text, lap_ms int, total_ms int, world int, seed int`). "Share Scorecard" copies an emoji race matrix and the challenge link.
+`?world=2&seed=98765` rebuilds the identical track (`src/utils/rng.ts`, mulberry32). "Share Scorecard" copies an emoji race matrix and the challenge link.
+
+**Global leaderboard (Supabase).**
+1. Create a Supabase project and run `supabase/migrations/001_scores.sql` in the SQL editor.
+2. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (see `.env.example`; on Vercel add them as Production env vars).
+
+How it is protected: the browser can only read the `leaderboard` view and call `submit_score`. It has no direct table access, so scores can't be edited or deleted. `submit_score` rejects lap times faster than a per-world physical limit (`world_limits`), sanitises the name, and keeps one row per device/world/seed that only ever improves. This stops casual tampering, not a determined cheater: times are reported by the client and there is no server-side replay check or rate limit.
+
+Without the env vars (or when offline) the board falls back to `localStorage` plus deterministic rival ghosts, and failed submissions are retried on the next launch.
 
 ## Deployment: production only, latest only
 - `vercel.json` skips every build that is not on `main` (`ignoreCommand`), so **preview deployments are never created**.
