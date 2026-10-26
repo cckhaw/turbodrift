@@ -88,3 +88,34 @@ describe('track map', () => {
     expect(labelColor('#bf5af2')).toBe('#ffffff');
   });
 });
+
+describe('map polish', () => {
+  it('marks item-box rows and boost pads once each, inside the lap', async () => {
+    const { generateTrack } = await import('../src/game/track');
+    const { trackMarks } = await import('../src/game/minimap');
+    for (const world of [1, 2, 3]) {
+      const t = generateTrack(world, 11);
+      const marks = trackMarks(t.segments);
+      expect(marks.some((m) => m.kind === 'box')).toBe(true);
+      expect(marks.some((m) => m.kind === 'pad')).toBe(true);
+      for (const m of marks) {
+        expect(m.t).toBeGreaterThanOrEqual(0);
+        expect(m.t).toBeLessThan(1);
+      }
+      expect(marks.filter((m) => m.kind === 'pad').length).toBe(t.segments.filter((s, i) => s.pad && !t.segments[(i - 1 + t.segments.length) % t.segments.length].pad).length);
+    }
+  });
+
+  it('spreads a standing-start pack so no two dots overlap, and leaves you where you are', async () => {
+    const { generateTrack } = await import('../src/game/track');
+    const { buildTrackMap, declutter, pointAt } = await import('../src/game/minimap');
+    const map = buildTrackMap(generateTrack(1, 3).segments.map((s) => s.curve));
+    const pack = [0, 1, 2, 3, 4, 5].map((id) => ({ id, t: 0.0005 * (id % 2), you: id === 2 }));
+    const spots = declutter(map, pack);
+    const pts = [...spots.values()];
+    for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) expect(Math.hypot(pts[i][0] - pts[j][0], pts[i][1] - pts[j][1])).toBeGreaterThan(5);
+    const mine = spots.get(2)!;
+    const home = pointAt(map, pack[2].t);
+    expect(Math.hypot(mine[0] - home[0], mine[1] - home[1])).toBeLessThan(0.001);
+  });
+});

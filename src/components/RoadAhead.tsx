@@ -4,6 +4,8 @@ import { bendLabel, M_PER_SEG, type Ahead, type AheadMark, type Bend } from '../
 interface Props {
   ahead: Ahead;
   hairpinTrack: boolean;
+  /** just the bend call-out, no road picture */
+  chipOnly?: boolean;
 }
 
 const SEVERITY_COLOR = ['', '#ffffff', '#ffd60a', '#ff2d55'];
@@ -22,7 +24,7 @@ function Chevrons({ b }: { b: Bend }) {
 }
 
 /** A GPS-style view of the road in front of you: the bends, plus boost pads, item boxes and hazards. */
-export default function RoadAhead({ ahead, hairpinTrack }: Props) {
+export default function RoadAhead({ ahead, hairpinTrack, chipOnly = false }: Props) {
   const { bend, then } = ahead;
   const pts = useMemo(() => ahead.ribbon.map(([x, y]) => [50 + x * SCALE, 62 + y * SCALE] as const), [ahead.ribbon]);
   const line = pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
@@ -43,23 +45,25 @@ export default function RoadAhead({ ahead, hairpinTrack }: Props) {
 
   return (
     <div className="glass !rounded-2xl p-1.5" aria-label="Road ahead">
-      <svg viewBox="0 0 100 70" className="block h-[82px] w-[118px] overflow-hidden rounded-xl bg-black/25">
-        <polyline points={line} fill="none" stroke="rgba(0,0,0,0.7)" strokeWidth="9.5" strokeLinecap="round" strokeLinejoin="round" />
-        <polyline points={line} fill="none" stroke="#3b4668" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
-        <polyline points={line} fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="0.9" strokeDasharray="2.2 2.6" strokeLinejoin="round" />
-        {ahead.marks.map((m, i) => {
-          const p = markAt(m);
-          if (!p) return null;
-          if (m.kind === 'pad') return <rect key={i} x={p.x - 2.6} y={p.y - 1.5} width="5.2" height="3" rx="0.8" fill="#ffd60a" />;
-          if (m.kind === 'box') return <rect key={i} x={p.x - 2.2} y={p.y - 2.2} width="4.4" height="4.4" fill="#ff9f0a" stroke="#fff" strokeWidth="0.7" transform={`rotate(45 ${p.x} ${p.y})`} />;
-          if (m.kind === 'wind') return <circle key={i} cx={p.x} cy={p.y} r="2.8" fill="none" stroke="#5ac8fa" strokeWidth="1.2" />;
-          return <rect key={i} x={p.x - 2.2} y={p.y - 2.2} width="4.4" height="4.4" fill="#ff2d55" />;
-        })}
-        {/* you */}
-        <path d="M50 62 L45.5 69 L50 66.6 L54.5 69 Z" fill="#fff" stroke="#007aff" strokeWidth="1.2" strokeLinejoin="round" />
-      </svg>
+      {!chipOnly && (
+        <svg viewBox="0 0 100 70" className="block h-[82px] w-[118px] overflow-hidden rounded-xl bg-black/25">
+          <polyline points={line} fill="none" stroke="rgba(0,0,0,0.7)" strokeWidth="9.5" strokeLinecap="round" strokeLinejoin="round" />
+          <polyline points={line} fill="none" stroke="#3b4668" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
+          <polyline points={line} fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="0.9" strokeDasharray="2.2 2.6" strokeLinejoin="round" />
+          {ahead.marks.map((m, i) => {
+            const p = markAt(m);
+            if (!p) return null;
+            if (m.kind === 'pad') return <rect key={i} x={p.x - 2.6} y={p.y - 1.5} width="5.2" height="3" rx="0.8" fill="#ffd60a" />;
+            if (m.kind === 'box') return <rect key={i} x={p.x - 2.2} y={p.y - 2.2} width="4.4" height="4.4" fill="#ff9f0a" stroke="#fff" strokeWidth="0.7" transform={`rotate(45 ${p.x} ${p.y})`} />;
+            if (m.kind === 'wind') return <circle key={i} cx={p.x} cy={p.y} r="2.8" fill="none" stroke="#5ac8fa" strokeWidth="1.2" />;
+            return <rect key={i} x={p.x - 2.2} y={p.y - 2.2} width="4.4" height="4.4" fill="#ff2d55" />;
+          })}
+          {/* you */}
+          <path d="M50 62 L45.5 69 L50 66.6 L54.5 69 Z" fill="#fff" stroke="#007aff" strokeWidth="1.2" strokeLinejoin="round" />
+        </svg>
+      )}
 
-      <div className="mt-1 flex items-center gap-1.5 px-0.5">
+      <div className={`flex items-center gap-1.5 px-0.5 ${chipOnly ? '' : 'mt-1'}`}>
         {bend ? (
           <>
             <Chevrons b={bend} />

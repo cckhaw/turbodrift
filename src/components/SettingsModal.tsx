@@ -7,7 +7,7 @@ import { copyText } from '../utils/share';
 import { hapticsEnabled, hapticsSupported, setHaptics } from '../utils/haptics';
 import { getPlayerName, setPlayerName } from '../utils/leaderboard';
 import { resetProgress, type Progress } from '../utils/progress';
-import { loadSettings, saveSettings, type Settings } from '../utils/settings';
+import { HUD_MODES, loadSettings, saveSettings, type Settings } from '../utils/settings';
 
 interface Props {
   muted: boolean;
@@ -157,6 +157,15 @@ export default function SettingsModal({ muted, onMute, onProgress, onClose, onTu
           <Section title="Graphics">
             <Row label="Battery saver" hint="Lower resolution for smoother play on older phones">
               <Toggle on={s.quality === 'low'} label="Battery saver" onChange={(v) => update({ quality: v ? 'low' : 'high' })} />
+            </Row>
+            <Row label="Track map & road ahead" hint="Tap the panels during a race to switch too">
+              <div role="radiogroup" aria-label="Race panels" className="flex rounded-pill bg-black/30 p-0.5 text-xs font-semibold">
+                {HUD_MODES.map((m) => (
+                  <button key={m} role="radio" aria-checked={s.hud === m} onClick={() => update({ hud: m })} className={`rounded-pill px-2.5 py-1 capitalize transition ${s.hud === m ? 'bg-apple-blue text-white' : 'text-white/60'}`}>
+                    {m}
+                  </button>
+                ))}
+              </div>
             </Row>
             <Row label="Screen shake">
               <Toggle on={s.shake} label="Screen shake" onChange={(v) => update({ shake: v })} />

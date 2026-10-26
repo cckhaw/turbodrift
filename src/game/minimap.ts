@@ -77,3 +77,48 @@ export function labelColor(hex: string): string {
   const lum = (0.299 * ((v >> 16) & 255) + 0.587 * ((v >> 8) & 255) + 0.114 * (v & 255)) / 255;
   return lum > 0.62 ? '#10131c' : '#ffffff';
 }
+
+export interface MapMark {
+  t: number; // 0..1 around the lap
+  kind: 'box' | 'pad';
+}
+
+/** Item-box rows and boost pads as positions around the lap (a row of boxes across several segments counts once). */
+export function trackMarks(segments: { boxes?: unknown[]; pad?: unknown }[]): MapMark[] {
+  const n = segments.length;
+  const out: MapMark[] = [];
+  segments.forEach((s, i) => {
+    const prev = segments[(i - 1 + n) % n];
+    if (s.boxes && !prev.boxes) out.push({ t: i / n, kind: 'box' });
+    if (s.pad && !prev.pad) out.push({ t: i / n, kind: 'pad' });
+  });
+  return out;
+}
+
+const OFFSETS: [number, number][] = [[0, 0], [0, 1], [0, -1], [1, 0], [-1, 0], [1, 1], [-1, -1], [1, -1], [-1, 1], [0, 2], [0, -2], [2, 0], [-2, 0]];
+
+/** Nudge dots that sit on top of each other (a standing start, a tight pack) sideways so every number stays readable. */
+export function declutter(map: TrackMap, items: { id: number; t: number; you?: boolean }[], gap = 7.5): Map<number, [number, number]> {
+  const placed: [number, number][] = [];
+  const out = new Map<number, [number, number]>();
+  // you keep your true spot; everyone else shuffles around you
+  for (const it of [...items].sort((a, b) => Number(!!b.you) - Number(!!a.you) || a.t - b.t || a.id - b.id)) {
+    const [x, y] = pointAt(map, it.t);
+    const [x2, y2] = pointAt(map, it.t + 0.004);
+    const len = Math.hypot(x2 - x, y2 - y) || 1;
+    const tx = (x2 - x) / len;
+    const ty = (y2 - y) / len;
+    let best: [number, number] = [x, y];
+    // try spots in growing rings around the true position: across the road first, then along it
+    for (const [along, across] of OFFSETS) {
+      const c: [number, number] = [x + (tx * along - ty * across) * gap, y + (ty * along + tx * across) * gap];
+      if (placed.every(([px, py]) => Math.hypot(px - c[0], py - c[1]) >= gap - 0.01)) {
+        best = c;
+        break;
+      }
+    }
+    placed.push(best);
+    out.set(it.id, best);
+  }
+  return out;
+}

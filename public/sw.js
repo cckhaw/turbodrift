@@ -1,5 +1,5 @@
 // Offline shell: network-first for pages, cache-first for hashed assets.
-const CACHE = 'turbodrift-v1';
+const CACHE = 'turbodrift-v2';
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(['/', '/favicon.svg', '/manifest.webmanifest'])));

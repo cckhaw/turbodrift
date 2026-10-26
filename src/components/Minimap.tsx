@@ -1,16 +1,19 @@
 import { useMemo } from 'react';
-import { closedPath, labelColor, pathBetween, pointAt, type TrackMap } from '../game/minimap';
+import { closedPath, declutter, labelColor, pathBetween, pointAt, type MapMark, type TrackMap } from '../game/minimap';
 import type { HudSnapshot } from '../game/types';
 
 interface Props {
   map: TrackMap;
   racers: HudSnapshot['racers'];
+  marks?: MapMark[];
+  compact?: boolean;
 }
 
 /** The whole lap from above. Every kart is a coloured dot with its race position inside; yours glows. */
-export default function Minimap({ map, racers }: Props) {
+export default function Minimap({ map, racers, marks = [], compact = false }: Props) {
   const outline = useMemo(() => closedPath(map), [map]);
   const me = racers.find((r) => r.you);
+  const spots = useMemo(() => declutter(map, racers, compact ? 9 : 7.5), [map, racers, compact]);
   const ahead = me ? pathBetween(map, me.t, me.t + 0.16) : null;
 
   // start/finish line: a short dashed bar across the track at the first point
@@ -25,14 +28,23 @@ export default function Minimap({ map, racers }: Props) {
 
   return (
     <div className="glass !rounded-2xl p-1.5" aria-label="Track map">
-      <svg viewBox="0 0 100 100" className="block h-[118px] w-[118px] overflow-visible">
+      <svg viewBox="0 0 100 100" className={`block overflow-visible ${compact ? 'h-[84px] w-[84px]' : 'h-[118px] w-[118px]'}`}>
         <path d={outline} fill="none" stroke="rgba(0,0,0,0.55)" strokeWidth="8" strokeLinejoin="round" />
         <path d={outline} fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="4.6" strokeLinejoin="round" />
         {ahead && <path d={ahead} fill="none" stroke="#5ac8fa" strokeWidth="4.6" strokeLinecap="round" strokeLinejoin="round" opacity="0.95" />}
         <line x1={x0 - nx * 5} y1={y0 - ny * 5} x2={x0 + nx * 5} y2={y0 + ny * 5} stroke="#fff" strokeWidth="2.4" strokeDasharray="1.6 1.6" />
 
+        {marks.map((m, i) => {
+          const [x, y] = pointAt(map, m.t);
+          return m.kind === 'pad' ? (
+            <rect key={i} x={x - 2.4} y={y - 1.2} width="4.8" height="2.4" rx="0.6" fill="#ffd60a" opacity="0.9" />
+          ) : (
+            <rect key={i} x={x - 1.7} y={y - 1.7} width="3.4" height="3.4" fill="#ff9f0a" opacity="0.95" transform={`rotate(45 ${x} ${y})`} />
+          );
+        })}
+
         {order.map((r) => {
-          const [x, y] = pointAt(map, r.t);
+          const [x, y] = spots.get(r.id) ?? [0, 0];
           const radius = r.you ? 7.4 : 6.2;
           const fill = r.ghost ? 'rgba(255,255,255,0.12)' : r.color;
           return (
