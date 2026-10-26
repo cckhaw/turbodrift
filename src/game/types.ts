@@ -58,6 +58,7 @@ export interface Car {
   finishTime: number | null;
   lap: number;
   steerVis: number;
+  ghost?: boolean;
 }
 
 export interface Track {

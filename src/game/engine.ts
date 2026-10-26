@@ -1,5 +1,7 @@
 import { synth } from '../audio/synth';
 import { Rng, hashSeed } from '../utils/rng';
+import { haptic } from '../utils/haptics';
+import { GHOST_DT, ghostAt, loadGhost, saveGhost, type Ghost } from '../utils/ghost';
 import { BOT_COLORS, BOT_NAMES, LAPS, SEG_LENGTH, WORLDS } from './worlds';
 import { generateTrack } from './track';
 import { drawBackdrop, drawHazard, drawKart, drawScenery, lerp, makeBackdrop, mix, type Backdrop } from './draw';
@@ -82,6 +84,10 @@ export class Engine {
   private fallT = 0;
   private blinkT = 0;
   private hitCd = 0;
+  private ghost: Ghost | null;
+  private ghostCar: Car | null = null;
+  private rec: Ghost = { lapMs: 0, d: [], x: [] };
+  private recT = 0;
   private lapTimes: number[] = [];
   private lapPositions: number[] = [];
   private playerLap = 1;
@@ -97,6 +103,8 @@ export class Engine {
     this.backdrop = makeBackdrop(() => r.next());
     this.player = this.makeCar(0, 'YOU', '#007AFF', '#5AC8FA', true);
     this.setupGrid(r);
+    this.ghost = loadGhost(o.world, o.seed);
+    if (this.ghost) this.ghostCar = { ...this.makeCar(99, 'BEST', '#ffffff', '#ffffff', false), ghost: true };
     this.resize();
     this.resizeObs = new ResizeObserver(() => this.resize());
     this.resizeObs.observe(o.canvas);
@@ -208,6 +216,7 @@ export class Engine {
     this.updateBots(dt, false);
     this.collisions(dt);
     this.trackLaps();
+    this.stepGhost(dt);
     this.stepParticles(dt);
 
     if (this.state === 'finished') {
@@ -267,7 +276,10 @@ export class Engine {
     if (this.drifting) {
       this.driftCharge += dt * (0.8 + 0.4 * Math.abs(steer));
       const lvl: 0 | 1 | 2 = this.driftCharge > 2.1 ? 2 : this.driftCharge > 0.9 ? 1 : 0;
-      if (lvl > this.driftLvl) synth.driftLevel(lvl);
+      if (lvl > this.driftLvl) {
+        synth.driftLevel(lvl);
+        haptic.driftLevel();
+      }
       this.driftLvl = lvl;
       steerEff = this.driftDir * (0.6 + 0.4 * clamp(steer * this.driftDir, -1, 1));
       cent *= 0.38;
@@ -302,12 +314,14 @@ export class Engine {
       this.driftLvl = 0;
       this.say(wd.id === 3 ? 'Burned! 🔥' : 'Fell off the sky track!');
       synth.fall();
+      haptic.fall();
     }
 
     // pads + hazards on the segment we are in
     if (seg.pad && Math.abs(p.x - seg.pad.offset) < seg.pad.width + 0.1 && this.boostT < 0.9) {
       this.boostT = 1.2;
       synth.pad();
+      haptic.pad();
       this.say('BOOST PAD');
     }
     if (seg.hazard && this.hitCd <= 0 && this.blinkT <= 0) {
@@ -321,16 +335,34 @@ export class Engine {
         this.shake = 1;
         this.say(hz.kind === 'wind' ? 'Wind gust!' : 'Crash!');
         synth.hit();
+        haptic.hit();
       }
     }
     this.visTilt = lerp(this.visTilt, steerEff, Math.min(1, dt * 8));
     this.visDrift = lerp(this.visDrift, this.drifting ? this.driftDir * (0.5 + 0.3 * steer * this.driftDir) : 0, Math.min(1, dt * 10));
   }
 
+  private stepGhost(dt: number) {
+    if (this.state !== 'racing') return;
+    this.recT += dt;
+    while (this.recT >= GHOST_DT) {
+      this.recT -= GHOST_DT;
+      this.rec.d.push(this.player.dist - (this.playerLap - 1) * this.track.length);
+      this.rec.x.push(this.player.x);
+    }
+    if (this.ghost && this.ghostCar) {
+      const g = ghostAt(this.ghost, this.lapT);
+      this.ghostCar.dist = (this.playerLap - 1) * this.track.length + g.d;
+      this.ghostCar.x = g.x;
+      this.ghostCar.speed = 0;
+    }
+  }
+
   private releaseDrift(cancel = false) {
     if (!cancel && this.driftLvl > 0) {
       this.boostT = this.driftLvl === 2 ? 1.7 : 0.95;
       synth.boost(this.driftLvl);
+      haptic.boost();
       this.say(this.driftLvl === 2 ? 'TURBO!!' : 'Turbo!');
       this.shake = 0.5;
     }
@@ -426,6 +458,7 @@ export class Engine {
         if (dz > 0) p.speed = Math.min(p.speed, b.speed * 1.02);
         else b.speed = Math.min(b.speed, p.speed * 1.02);
         synth.bump();
+        haptic.bump();
         this.shake = Math.max(this.shake, 0.35);
       }
     }
@@ -444,7 +477,16 @@ export class Engine {
     const p = this.player;
     const lap = clamp(Math.floor(p.dist / this.track.length) + 1, 1, LAPS + 1);
     if (lap > this.playerLap && this.state === 'racing') {
-      this.lapTimes.push(this.lapT * 1000);
+      const lapMs = this.lapT * 1000;
+      if (this.rec.d.length > 5 && (!this.ghost || lapMs < this.ghost.lapMs)) {
+        this.ghost = { lapMs, d: this.rec.d, x: this.rec.x };
+        saveGhost(this.o.world, this.o.seed, this.ghost);
+        this.ghostCar ??= { ...this.makeCar(99, 'BEST', '#ffffff', '#ffffff', false), ghost: true };
+        this.say('NEW BEST LAP');
+      }
+      this.rec = { lapMs: 0, d: [], x: [] };
+      this.recT = 0;
+      this.lapTimes.push(lapMs);
       this.lapPositions.push(this.rank().indexOf(p) + 1);
       this.lapT = 0;
       this.playerLap = lap;
@@ -454,9 +496,11 @@ export class Engine {
         this.drifting = false;
         const pos = this.rank().indexOf(p) + 1;
         synth.finish(pos <= 3);
+        haptic.finish();
         this.say(pos === 1 ? 'VICTORY!' : 'FINISH!');
       } else {
         synth.lap();
+        haptic.lap();
         this.say(lap === LAPS ? 'FINAL LAP' : `LAP ${lap}`);
       }
     }
@@ -559,10 +603,8 @@ export class Engine {
     const camY = CAM_H + playerY;
 
     // assign cars to segments
-    for (const s of this.cars) {
-      const sg = this.seg(s.dist);
-      sg.cars.push(s);
-    }
+    const drawn = this.ghostCar && this.state === 'racing' ? [...this.cars, this.ghostCar] : this.cars;
+    for (const s of drawn) this.seg(s.dist).cars.push(s);
 
     let maxy = H;
     let x = 0;
@@ -661,8 +703,8 @@ export class Engine {
           const sx = lerp(seg.p1.screen.x, seg.p2.screen.x, pct) + (sc * car.x * roadW * W) / 2;
           const sy = lerp(seg.p1.screen.y, seg.p2.screen.y, pct);
           const kw = (sc * KART_W * W) / 2;
-          drawKart(c, sx, sy, kw, car.color, car.accent, { tilt: 0, drift: 0, boost: car.speed > this.wd.maxSpeed * 1.05, flicker: Math.random(), fall: 0, blink: false }, seg.clip);
-          if (kw > 26 && kw < W * 0.2 && sy < H * 0.8) {
+          drawKart(c, sx, sy, kw, car.color, car.accent, { tilt: 0, drift: 0, boost: !car.ghost && car.speed > this.wd.maxSpeed * 1.05, flicker: Math.random(), fall: 0, blink: !!car.ghost }, seg.clip);
+          if (kw > 26 && kw < W * 0.2 && sy < H * 0.8 && !car.ghost) {
             c.font = `600 ${Math.max(9, Math.round(kw * 0.17))}px -apple-system, system-ui, sans-serif`;
             c.textAlign = 'center';
             c.fillStyle = 'rgba(255,255,255,0.8)';
@@ -675,7 +717,7 @@ export class Engine {
         this.drawPlayer();
       }
     }
-    for (const s of this.cars) this.seg(s.dist).cars.length = 0;
+    for (const s of drawn) this.seg(s.dist).cars.length = 0;
     // fog layer must not tint sprites; just clear the cars lists above
     this.drawOverlay();
     c.restore();

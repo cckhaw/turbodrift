@@ -7,6 +7,7 @@ import { synth } from './audio/synth';
 import { WORLDS } from './game/worlds';
 import type { RaceResult } from './game/types';
 import { getPlayerName, saveScore } from './utils/leaderboard';
+import { hapticsEnabled, setHaptics } from './utils/haptics';
 import { loadProgress, recordFinish, type Progress } from './utils/progress';
 import { randomSeed } from './utils/rng';
 
@@ -39,6 +40,7 @@ export default function App() {
   const [unlock, setUnlock] = useState<number | null>(null);
   const [board, setBoard] = useState(false);
   const [muted, setMuted] = useState(false);
+  const [haptics, setHapticsState] = useState(hapticsEnabled);
 
   const pickWorld = (w: number) => {
     setWorld(w);
@@ -82,6 +84,11 @@ export default function App() {
           fromLink={fromLink}
           progress={progress}
           muted={muted}
+          haptics={haptics}
+          onHaptics={() => {
+            setHaptics(!haptics);
+            setHapticsState(!haptics);
+          }}
           onWorld={pickWorld}
           onSeed={pickSeed}
           onRace={race}
