@@ -5,8 +5,10 @@ Mobile-first arcade kart racer for the browser. React + Vite + Canvas (pseudo-3D
 ```bash
 npm install
 npm run dev        # http://localhost:5173
+npm test           # vitest: rng, track generation, API (in-memory Postgres), headless full races
 npm run build
 ```
+CI (`.github/workflows/ci.yml`) runs typecheck, tests and build on every PR and on `main`.
 
 ## How to play
 - **Steer:** drag your thumb left/right anywhere on screen (arrow keys / A-D on desktop). The kart accelerates automatically.
