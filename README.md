@@ -1,54 +1,239 @@
 # Turbo Drift: Neon Circuit
 
-Mobile-first arcade kart racer for the browser. React + Vite + Canvas (pseudo-3D) + Tailwind + Web Audio. No assets, no install.
+A mobile-first arcade kart racer that runs in the browser: pseudo-3D drift racing against five AI bots across three worlds, with items, three karts, a daily challenge and a global leaderboard whose times are **verified on the server by replaying your inputs**. Nothing to install and no art assets (everything is drawn on a canvas and synthesised with Web Audio).
+
+**Stack:** React 18 · Vite 5 · TypeScript · Tailwind CSS 3 · HTML5 Canvas · Web Audio API · Vercel Functions · Neon Postgres · Vitest.
+
+## Contents
+- [Quick start](#quick-start)
+- [How to play](#how-to-play)
+- [Features](#features)
+- [Settings](#settings)
+- [Configuration](#configuration)
+- [Architecture](#architecture)
+- [Leaderboard, anti-cheat and cloud save](#leaderboard-anti-cheat-and-cloud-save)
+- [HTTP API](#http-api)
+- [Testing](#testing)
+- [Deployment](#deployment)
+- [Known limits](#known-limits)
+
+## Quick start
 
 ```bash
 npm install
-npm run dev        # http://localhost:5173
-npm test           # vitest: rng, track generation, replay verification, API + cloud save (in-memory Postgres), offline queue, headless full races
-npm run build
+npm run dev        # http://localhost:5173 (also reachable from your phone on the same network)
+npm test           # 93 tests
+npm run build      # typecheck + production build
 ```
-CI (`.github/workflows/ci.yml`) runs typecheck, tests and build on every PR and on `main`.
+
+In `npm run dev` there is no API: the leaderboard falls back to this device's times plus deterministic rival ghosts, and cloud save is unavailable. The server features run on Vercel (see [Deployment](#deployment)) and are covered by tests that run the same code against an in-memory Postgres.
 
 ## How to play
-- **Steer:** drag your thumb left/right anywhere on screen (arrow keys / A-D on desktop). The kart accelerates automatically.
-- **Drift / boost:** hold the DRIFT button (bottom-right, `Space`/`Shift` on desktop) while steering into a turn. Hold until the ring turns blue → pink, release for a mini-turbo. Hard corners in worlds 2–3 are very hard to take without drifting.
-- Drive through the spinning **?** boxes (race mode) to get an item and tap the item button (or `E`): 🚀 turbo, 🛡️ shield, 🛢️ oil slick, 🎯 homing missile. Items rubber-band: leaders get defence, the back of the pack gets turbos and missiles. Bots use items too.
-- **Karts:** Comet (balanced), Rocket (fast, heavy), Phantom (nimble, charges drifts quickly).
-- **Time Trial:** solo run with no bots or items against your best-lap ghost for that kart. This is the mode whose times go on the global board (verified server-side).
-- **Daily challenge:** one shared track per UTC day (world rotates, seed from the date), played as a time trial. Because everyone gets the same seed, the leaderboard for that seed is the daily board. Streak counter (🔥) for consecutive days.
-- Yellow chevrons are boost pads. Wind gates (world 2) and blocks (world 3) slow you down. On sky/lava tracks, leaving the road means a fall.
-- 3 laps against 5 bots. Finish top 3 to unlock the next world.
 
-## Worlds
-| # | World | Tier |
-|---|-------|------|
-| 1 | Neon Megacity | Beginner — wide road, gentle curves |
-| 2 | Cyber Stratosphere | Intermediate — sky track, moving wind barriers |
-| 3 | Obsidian Core | Expert — hairpins, narrow lava bridges |
+| Action | Touch | Keyboard |
+|---|---|---|
+| Steer | Drag your thumb left/right anywhere on screen (the anchor follows your thumb, so reversing is instant) | ← → or A / D |
+| Drift / boost | Hold the **DRIFT** button (bottom right) while steering into a turn, release to boost | Space, Shift or ↓ |
+| Use item | Tap the item button next to DRIFT | E, Enter or ↑ |
+| Pause | Pause button (top right) | Esc or P |
 
-## Bots
-`src/game/engine.ts` (`updateBots`): waypoint following along a precomputed racing line (`track.ts`), look-ahead lane changes, corner braking, plus rubber-banding relative to the player (stronger on the final lap) so races stay close.
+The kart accelerates automatically.
 
-## Challenge seeds & leaderboard
-`?world=2&seed=98765` rebuilds the identical track (`src/utils/rng.ts`, mulberry32). "Share Scorecard" copies an emoji race matrix and the challenge link.
+**Drifting.** Hold DRIFT while steering above a quarter of full lock at more than ~35 % speed. The ring around the button fills as the charge builds (faster in tighter turns, and fastest in the Phantom): at the first level it turns blue and releasing gives a 0.95 s mini-turbo, at the second it turns pink and you get a 1.7 s turbo. While drifting you turn harder and the track's centrifugal push is cut by ~60 %; steering with the drift tightens the arc, steering against it widens it. The worlds get harder to take without drifting: world 1 is forgiving, world 3's hairpins are very hard without it.
 
-**Global leaderboard (Neon Postgres, server-verified).** Two Vercel Functions (`api/score.ts`, `api/leaderboard.ts`) talk to Neon through `@neondatabase/serverless` using the `DATABASE_URL` that the Neon integration injects. The `scores` table is created automatically on the first request (`db/schema.sql` is a reference copy). The browser never sees database credentials.
+**On the road.**
+- Yellow chevrons are **boost pads** (1.2 s boost).
+- **Item boxes** (`?`, race mode only) respawn after 5 s.
+- World 2 has moving **wind gates** and world 3 has static **blocks**; hitting one cuts your speed to 45 %.
+- World 1 slows you on the grass. On the sky track (world 2) and the lava bridges (world 3), leaving the road means a **fall**: you respawn on the racing line after about a second.
+- 3 laps. In a race you start 4th of 6 and bots rubber-band so the pack stays close.
 
-*Anti-cheat.* The simulation runs at a fixed 60 Hz step, and a Time Trial records the player's inputs (run-length encoded, ~20 KB for a full race). The client submits **only that recording**, never a time. `api/score.ts` re-runs the real game engine headlessly with those inputs (`src/game/verify.ts`) and stores the times *the simulation* produced, so a tampered client can't claim a lap it didn't drive. Races against bots aren't replayable across devices, so the global board is **Time Trial only**; races still count for local records and unlocks. Replays are rejected if malformed, if they don't finish 3 laps, or if the resulting lap is faster than a per-world physical limit; each device is also throttled to one submission per 45 s. Remaining limits: someone could still write a bot that *drives* well (inputs are inputs), and clients could replay a friend's recording under their own name.
+## Features
 
-*Offline.* Time trials that can't be submitted (offline, 5xx, throttled) are queued on the device (up to 10, kept 7 days) and retried on launch, when the browser comes back online, and after the next run. Definitive rejections (4xx) are dropped.
+### Game modes
+- **Race**: 3 laps against 5 bots (CyberBot-01, NeonViper, GlitchRider, ByteBlaze, ChromeFang, PulseNova pool), with item boxes. Finishing in the top 3 unlocks the next world.
+- **Time Trial**: solo, no bots or items, racing your own best-lap **ghost** for that kart. This is the mode whose times go on the global leaderboard.
+- **Daily challenge**: one track per UTC day for everyone (the world rotates 1 → 2 → 3, the seed is derived from the date), played as a Time Trial. Because everyone gets the same seed, the leaderboard for that seed *is* the daily board. The menu card shows your best, the time until the reset, a ✅ once done and a 🔥 streak of consecutive days.
 
-*Ghosts* are stored per world + seed + **kart**, so you never race a ghost from a faster kart.
+### Worlds and progression
 
-*Cloud save.* World unlocks, medals, daily streak, name and kart can follow you across devices without an account: Settings → Cloud save gives a secret 12-character sync code; entering it on another device restores the save. Merging only ever moves progress forward, so a stale device can't undo unlocks. `api/save.ts` stores it (strictly validated; creation throttled per IP). Anyone with the code can read and update that save, so treat it like a password. Race results themselves aren't verified, so unlock progress is trust-based.
+| # | World | Tier | Road | Curves | Lap (≈) | Notes |
+|---|---|---|---|---|---|---|
+| 1 | Neon Megacity | Beginner | wide | gentle (max 3) | 1500 segments, ~40 s | grass slows you, bright cyan city |
+| 2 | Cyber Stratosphere | Intermediate | medium | up to 5 | 1800 segments | sky track, moving wind gates, falls |
+| 3 | Obsidian Core | Expert | narrow | up to 6.5 incl. hairpins | 2000 segments | lava-lit bridges, blocks, falls |
 
-Without the API (or in `npm run dev`, unless `VITE_API_BASE` points at a deployed API) the board falls back to `localStorage` plus deterministic rival ghosts.
+World 1 is open; world 2 unlocks with a podium finish (top 3) in world 1, and world 3 with a podium in world 2. A challenge link or the daily challenge opens its world regardless. Progress, medals and the daily streak are stored on the device and can be synced with [cloud save](#cloud-save).
 
-**Settings** (gear icon on the menu, or Settings in the pause menu): sound on/off, music and effects volume, steering sensitivity, vibration, battery saver (lower resolution), screen shake, player name, cloud save, and reset progress.
+### Karts
 
-## Deployment: production only, latest only
-- `vercel.json` skips every build that is not on `main` (`ignoreCommand`), so **preview deployments are never created**.
-- On every push to `main`, `.github/workflows/cleanup-deployments.yml` waits for the production deployment built from that commit to become `READY` (Vercel's integration reports via commit statuses, not GitHub Deployments, so a `deployment_status` trigger can't work) and runs `scripts/cleanup-deployments.mjs`, which deletes **all older deployments** and keeps only the latest. It refuses to delete anything unless the deployment to keep is found and `READY`, aborts if that build fails, and never touches anything newer. `npm run deploy` does the same locally. You can also run the workflow manually (Actions → *Keep only the latest deployment* → Run workflow).
-- Required GitHub Actions secrets: `VERCEL_TOKEN`, `VERCEL_PROJECT_ID`, and `VERCEL_TEAM_ID` (or `VERCEL_ORG_ID`; either name works; omit for a personal account). Without the token and project id the job just prints a warning.
-- Manual deploy: `npx vercel link` once, then `npm run deploy` (always `--prod`). Preview with `npm run cleanup:deployments -- --dry-run` (set `KEEP_DEPLOYMENT=<id|url>` or `KEEP_SHA=<commit>`).
+| Kart | Top speed | Acceleration | Turning | Drift charge | Character |
+|---|---|---|---|---|---|
+| Comet | 1.00 | 1.00 | 1.00 | 1.00 | balanced all-rounder |
+| Rocket | 1.06 | 0.85 | 0.88 | 1.00 | fast on straights, heavy in corners |
+| Phantom | 0.97 | 1.10 | 1.10 | 1.35 | nimble, charges drifts quickly |
+
+Each has its own silhouette in the race and a live preview in the picker. Ghosts are stored per world + seed + kart.
+
+### Items (race mode)
+🚀 **Turbo** (1.6 s boost) · 🛡️ **Shield** (7 s, absorbs one hit) · 🛢️ **Oil slick** (dropped behind you, lasts 14 s, spins whoever drives through it) · 🎯 **Homing missile** (locks the nearest kart ahead within ~14 000 units).
+
+A hit spins you out for 1 s and cuts your speed to 40 %. Item odds depend on your position: leaders mostly get defence (shield, oil), the back of the pack mostly gets turbos and missiles. Bots collect and use items too (missiles only with a target ahead, oil only with a car behind). All item rolls come from a seeded generator, so a race is reproducible.
+
+### Bots
+Waypoint following along a precomputed racing line (`track.ts`), look-ahead lane changes around traffic, corner braking, and rubber-banding relative to the player (stronger in the final lap) so races stay close until the end. Pace and rubber-banding strength scale with the world.
+
+### Seeded tracks and sharing
+`?world=2&seed=98765` rebuilds the identical track on any device (mulberry32 PRNG, `src/utils/rng.ts`). The menu has a seed field, a dice button for a random seed and a copy-link button; the URL always reflects the selection. **Share Scorecard** copies an emoji race matrix (⬜ cars ahead, 🟦 you, ⬛ cars behind, one row per lap) with the lap times and a challenge link; on mobile it uses the native share sheet from the leaderboard modal. Time Trials share lap times instead.
+
+### Leaderboard
+Board modal with two tabs: the current seed, and the best times across the world. Top 25 by best lap (one row per player per track), with your own rows highlighted and an editable name. It shows whether you are looking at the global board, or the offline fallback (your local times plus rival ghosts).
+
+### UI and presentation
+Apple-style glass interface: frosted panels (`rgba(255,255,255,0.08)` with a 28 px blur), 24 px squircle corners, the SF system font stack, Apple Blue `#007AFF` and neon pink `#FF2D55` on deep obsidian `#090D16`. Safe-area aware and thumb-first. Pseudo-3D road with hills, per-world skylines and parallax, fog, particles, speed lines, spin-outs and screen shake.
+
+### Audio, haptics and PWA
+- **Audio**: everything is synthesised live: engine tone that follows speed, drift hiss, countdown, pickups, hits, lap and finish jingles, and a procedural synthwave loop with a different tempo and scale per world.
+- **Haptics**: vibration for drift levels, boosts, pads, hits, falls, laps and the finish (browsers that support `navigator.vibrate`, so not iOS Safari).
+- **PWA**: installable (fullscreen, portrait manifest and icons) with an offline service worker (network-first pages, cache-first assets, `sw.js` is served `no-cache`).
+
+## Settings
+
+Gear icon on the menu, or **Settings** in the pause menu:
+
+| Section | Options |
+|---|---|
+| Audio | sound on/off, music volume, effects volume |
+| Controls | steering sensitivity (how far to drag for full lock), vibration |
+| Graphics | battery saver (lower render resolution), screen shake |
+| Profile | player name (shown on the leaderboard) |
+| Cloud save | turn on / copy your sync code, restore from a code, stop syncing |
+| Data | reset progress on this device |
+
+Volumes apply immediately; battery saver and screen shake apply from the next race.
+
+## Configuration
+
+### Environment variables
+
+| Variable | Where | Purpose |
+|---|---|---|
+| `DATABASE_URL` (or `POSTGRES_URL`) | Vercel, server-side | Neon connection string. The Neon integration injects it into the project. Used by the three API functions. |
+| `VITE_API_BASE` | build time, optional | Base URL for API calls from the client (default: same origin). The bundled functions don't send CORS headers, so this only helps if you put them behind your own CORS-enabled host. |
+| `VERCEL_TOKEN`, `VERCEL_PROJECT_ID`, `VERCEL_TEAM_ID` (or `VERCEL_ORG_ID`) | GitHub Actions **secrets**, and your shell for local deploys | Used by the deployment cleanup. Omit the team id for a personal account. |
+| `KEEP_DEPLOYMENT`, `KEEP_SHA`, `WAIT_MINUTES` | cleanup script | Which deployment to keep (see [Deployment](#deployment)); `WAIT_MINUTES` defaults to 12 with `KEEP_SHA`. |
+
+There is no `.env` to create for local play.
+
+### Data stored on the device (`localStorage`)
+
+| Key | Contents |
+|---|---|
+| `turbodrift.settings.v1` | the settings above |
+| `turbodrift.progress.v1` | unlocked world, best finish per world |
+| `turbodrift.scores.v1` | your local lap records (up to 200) |
+| `turbodrift.ghost.v2.<world>.<seed>.<kart>` | best-lap ghost |
+| `turbodrift.daily.v1` | completed daily-challenge dates |
+| `turbodrift.kart`, `turbodrift.mode`, `turbodrift.name`, `turbodrift.haptics` | last choices |
+| `turbodrift.client` | random device id used for the leaderboard (not personal data) |
+| `turbodrift.pending.v1` | time trials waiting to be submitted |
+| `turbodrift.synccode` | your cloud-save code, if enabled |
+
+### Database
+Two tables, created automatically on the first API request (`db/schema.sql` is a reference copy): `scores` (one row per device + world + seed, keeping the best times) and `saves` (cloud saves keyed by sync code). No migration step.
+
+## Architecture
+
+```
+src/
+  game/        engine.ts  fixed-step simulation, bots, items, rendering loop
+               track.ts   seeded track generation (curves, hills, pads, hazards, item boxes, racing line)
+               draw.ts    canvas drawing: backdrop, scenery, karts, boxes, props
+               worlds.ts  world configs   karts.ts  kart stats   items.ts  items and odds
+               replay.ts  input recording (run-length encoded)   verify.ts  server-side replay verification
+  audio/       synth.ts   Web Audio synthesiser
+  components/  Menu, RaceScreen (HUD + controls), Results, LeaderboardModal, SettingsModal, KartPreview
+  utils/       rng, daily, ghost, leaderboard (+ offline queue), cloud, progress, settings, haptics, share, api
+api/           score.ts  leaderboard.ts  save.ts  (Vercel Functions); _core.ts / _save.ts hold the logic
+db/schema.sql  scripts/  (deploy + deployment cleanup)  tests/
+```
+
+Notes:
+- **Rendering** is the classic pseudo-3D "segment" projection onto a 2D canvas, with sprites drawn far to near and clipped by hills.
+- **Simulation** runs at a fixed 60 Hz regardless of frame rate. The same engine runs headlessly on the server for verification, which is why `engine.ts` has no hard DOM dependency.
+- **API logic** (`_core.ts`, `_save.ts`) takes a tagged-template `sql` function, so the same code runs on Neon in production and on an in-memory Postgres in tests.
+
+## Leaderboard, anti-cheat and cloud save
+
+### Server-verified times
+A Time Trial records your steering and drift inputs (about 20 KB for a full race). The client submits **only that recording**, never a time. `api/score.ts` re-runs the real game engine headlessly with those inputs (`src/game/verify.ts`) and stores the times *the simulation* produced, so a tampered client can't claim a lap it didn't drive. A replay is rejected if it is malformed, doesn't finish 3 laps, or gives a lap faster than a per-world physical limit. Each device is limited to one submission per 45 s.
+
+Races against bots aren't replayable identically across devices, so the **global board is Time Trial only**; races still count for local records and world unlocks.
+
+### Offline queue
+Time trials that can't be submitted (offline, server error, throttled) are queued on the device (up to 10, kept 7 days) and retried on launch, when the browser comes back online and after your next run, in order and without duplicates. A definitive rejection (a 4xx other than 429) drops the entry.
+
+### Cloud save
+Turn it on in Settings → Cloud save to get a secret 12-character sync code (no account). Enter it on another device to restore unlocks, medals, daily streak, name and kart. Merging only ever moves progress **forward** (highest unlock, best finish per world, union of days), so a stale device can't undo an unlock. Creating a save is throttled per IP (one per minute). Anyone with the code can read and update that save, so treat it like a password.
+
+## HTTP API
+
+All endpoints return JSON with `Cache-Control: no-store`; errors are `{ "error": "<message>" }`.
+
+| Method & path | Body / query | Success | Errors |
+|---|---|---|---|
+| `GET /api/leaderboard` | `?world=1..3` and optional `&seed=N` | `[{ name, lap_ms, total_ms, world, seed }]` (top 25) | 400 bad world/seed, 503 |
+| `POST /api/score` | `{ clientId, name, replay }` | `{ ok: true, lapMs, totalMs }` (the **server's** times) | 400 invalid or unverifiable replay, 429 slow down, 503 |
+| `POST /api/save` | `{ unlocked, medals, days, name, kart }` | `{ code, save }` | 400 bad save, 429 slow down, 503 |
+| `GET /api/save` | `?code=XXXX-XXXX-XXXX` (case and dashes forgiven) | `{ save }` | 400 bad code, 404 unknown code, 503 |
+| `PUT /api/save` | `{ code, save }` | `{ save }` (merged, never lower) | 400, 404, 503 |
+
+`replay` is `{ v: 1, world, seed, kart, steps, data }`, where `data` is base64 of run-length-encoded inputs (see `src/game/replay.ts`).
+
+## Testing
+
+```bash
+npm test             # vitest run
+npm run typecheck
+```
+
+93 tests in `tests/` (they also run in CI):
+
+| File | Covers |
+|---|---|
+| `rng`, `track` | seeded determinism, closed loops, per-world limits, hazards, pads and item boxes, the API's lap-time floor versus game physics |
+| `race` | headless full races in every world (bots stay close, falls, determinism), Time Trial, kart differences, item hits, shield and oil behaviour |
+| `api` | replay verification (exact reproduction, tampering, malformed or unfinished recordings), server-computed times, throttling, best-time upsert, board queries |
+| `save`, `cloud` | save validation, sync codes, forward-only merging, device A → device B restore through the real API logic |
+| `queue` | offline queue: retries, ordering, throttling, concurrency, expiry, regression for the launch-time flush |
+| `ghost`, `daily`, `items`, `format-share`, `cleanup` | ghosts per kart and settings, daily rotation and streaks, item odds and kart stats, scorecard text, deployment selection |
+
+API tests run against an in-memory Postgres ([PGlite](https://pglite.dev)), so no database is needed.
+
+## Deployment
+
+The project deploys to **Vercel** with the **Neon** integration, **production only and latest only**:
+
+- `vercel.json` skips every build that isn't on `main` (`ignoreCommand`), so **preview deployments are never created**.
+- On every push to `main`, `.github/workflows/cleanup-deployments.yml` waits for the production deployment built from that commit to become `READY` and then runs `scripts/cleanup-deployments.mjs`, which deletes **all older deployments** and keeps only the latest. It refuses to delete anything unless the deployment to keep is found and `READY`, aborts if that build fails, and never touches anything newer. (Vercel's integration reports through commit statuses rather than GitHub Deployments, so a `deployment_status` trigger can't be used.)
+- **Required GitHub Actions secrets** (Settings → Secrets and variables → Actions → *Secrets*): `VERCEL_TOKEN`, `VERCEL_PROJECT_ID` and `VERCEL_TEAM_ID` (or `VERCEL_ORG_ID`). Without the token and project id the job logs a warning and does nothing. Run it manually from Actions → *Keep only the latest deployment* → Run workflow.
+- CI (`.github/workflows/ci.yml`) runs typecheck, tests and build on every pull request and on `main`.
+
+Manual deploy and cleanup:
+
+```bash
+npx vercel link                 # once
+npm run deploy                  # always --prod, then removes older deployments
+
+# preview what the cleanup would delete
+KEEP_SHA=<commit> npm run cleanup:deployments -- --dry-run      # keep the production deployment of a commit
+KEEP_DEPLOYMENT=<dpl_id|url> npm run cleanup:deployments -- --dry-run
+```
+
+## Known limits
+- **Cheating:** verification proves the recorded inputs produce the stored time, not that a human produced them. A program that *drives* well still passes, and a recording could be re-submitted under another name. Closing that needs per-player signing or accounts.
+- **Cross-device floats:** the server's replay can differ by a few milliseconds from what a different browser engine displayed; the server's number is what is stored.
+- **Unlocks** earned in races are trust-based (races aren't verifiable), and anyone with a sync code can read and update that save.
+- **Karts:** the global board mixes karts (the database doesn't record which kart set a time).
+- **Local development** has no API; test the server code with `npm test`.
+- Not yet play-tested on a wide range of real phones: touch feel, audio, vibration and balance (item frequency, missile strength, kart differences) may need tuning.
