@@ -1,1 +1,28 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="16" fill="#090D16"/><path d="M14 46 L30 14 H40 L28 36 H44 L24 52 Z" fill="#FF2D55"/><path d="M30 14 H40 L36 22 H28 Z" fill="#007AFF"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FF2D55"/><stop offset=".55" stop-color="#FF375F"/><stop offset="1" stop-color="#FF9F0A"/></linearGradient>
+<radialGradient id="glow" cx=".5" cy=".55" r=".5"><stop offset="0" stop-color="#5AC8FA" stop-opacity=".95"/><stop offset=".55" stop-color="#5AC8FA" stop-opacity=".25"/><stop offset="1" stop-color="#5AC8FA" stop-opacity="0"/></radialGradient>
+<linearGradient id="body" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2E9BFF"/><stop offset="1" stop-color="#0057D9"/></linearGradient>
+</defs>
+<rect width="512" height="512" rx="112" fill="url(#bg)"/>
+<g stroke="#fff" stroke-linecap="round" opacity=".55"><path d="M70 150h70M96 190h44M372 150h70M372 190h46" stroke-width="12"/></g>
+<circle cx="256" cy="278" r="190" fill="url(#glow)"/>
+<!-- exhaust flames -->
+<path d="M206 392c-10 24-4 46 8 62 6-16 18-30 22-46z M306 392c10 24 4 46-8 62-6-16-18-30-22-46z" fill="#FFD60A"/>
+<path d="M212 394c-4 14-2 28 4 38 4-10 10-20 14-30z M300 394c4 14 2 28-4 38-4-10-10-20-14-30z" fill="#fff"/>
+<!-- wheels -->
+<rect x="104" y="296" width="76" height="112" rx="26" fill="#0A0F1C"/><rect x="332" y="296" width="76" height="112" rx="26" fill="#0A0F1C"/>
+<rect x="116" y="312" width="16" height="80" rx="8" fill="#26324d"/><rect x="380" y="312" width="16" height="80" rx="8" fill="#26324d"/>
+<!-- body -->
+<path d="M160 234h192l46 160c2 8-3 14-11 14H125c-8 0-13-6-11-14z" fill="url(#body)" stroke="#0A0F1C" stroke-width="10" stroke-linejoin="round"/>
+<path d="M196 262h120l22 70H174z" fill="#0A0F1C" opacity=".35"/>
+<!-- tail lights -->
+<rect x="150" y="346" width="64" height="26" rx="13" fill="#FF2D55" stroke="#fff" stroke-width="5"/><rect x="298" y="346" width="64" height="26" rx="13" fill="#FF2D55" stroke="#fff" stroke-width="5"/>
+<!-- rear wing -->
+<rect x="104" y="214" width="304" height="30" rx="15" fill="#5AC8FA" stroke="#0A0F1C" stroke-width="10"/>
+<rect x="128" y="236" width="14" height="40" fill="#0A0F1C"/><rect x="370" y="236" width="14" height="40" fill="#0A0F1C"/>
+<!-- driver -->
+<circle cx="256" cy="190" r="50" fill="#fff" stroke="#0A0F1C" stroke-width="10"/>
+<rect x="214" y="172" width="84" height="26" rx="13" fill="#0A0F1C"/>
+<path d="M232 176h30" stroke="#5AC8FA" stroke-width="6" stroke-linecap="round"/>
+</svg>
