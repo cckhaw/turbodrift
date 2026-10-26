@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Check, Dices, Link2, Lock, Play, Trophy, Volume2, VolumeX } from 'lucide-react';
+import { Check, Dices, Link2, Lock, Play, Smartphone, Trophy, Volume2, VolumeX } from 'lucide-react';
 import { WORLDS } from '../game/worlds';
 import type { Progress } from '../utils/progress';
+import { hapticsSupported } from '../utils/haptics';
 import { randomSeed } from '../utils/rng';
 import { challengeUrl, copyText } from '../utils/share';
 
@@ -11,6 +12,8 @@ interface Props {
   fromLink: boolean;
   progress: Progress;
   muted: boolean;
+  haptics: boolean;
+  onHaptics: () => void;
   onWorld: (w: number) => void;
   onSeed: (s: number) => void;
   onRace: () => void;
@@ -41,9 +44,16 @@ export default function Menu(p: Props) {
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col">
         <div className="flex items-center justify-between">
           <span className="rounded-pill bg-glass px-3 py-1 text-xs font-medium tracking-wide text-white/70">v1 · ARCADE</span>
+          <div className="flex gap-2">
+          {hapticsSupported() && (
+            <button aria-label={p.haptics ? 'Turn haptics off' : 'Turn haptics on'} aria-pressed={p.haptics} onClick={p.onHaptics} className={`glass flex h-10 w-10 items-center justify-center !rounded-pill active:scale-95 ${p.haptics ? '' : 'opacity-50'}`}>
+              <Smartphone size={18} />
+            </button>
+          )}
           <button aria-label={p.muted ? 'Unmute' : 'Mute'} onClick={p.onMute} className="glass flex h-10 w-10 items-center justify-center !rounded-pill active:scale-95">
             {p.muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
           </button>
+          </div>
         </div>
 
         <header className="mt-6 animate-rise text-center">
