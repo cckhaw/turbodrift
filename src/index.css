@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+}
+
+html, body, #root { height: 100%; }
+body {
+  @apply bg-obsidian font-sans text-white antialiased;
+  margin: 0;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  overflow: hidden;
+}
+input { -webkit-user-select: text; user-select: text; }
+
+@layer components {
+  .glass {
+    @apply bg-glass border border-glass-border rounded-squircle shadow-glass backdrop-blur-glass;
+    -webkit-backdrop-filter: blur(28px);
+  }
+  .btn {
+    @apply rounded-pill px-6 py-3.5 font-semibold tracking-tight transition active:scale-95 select-none;
+  }
+  .btn-primary { @apply btn bg-apple-blue text-white shadow-neon-blue; }
+  .btn-hot { @apply btn bg-apple-pink text-white shadow-neon-pink; }
+  .btn-glass { @apply btn bg-glass-strong border border-glass-border text-white backdrop-blur-glass; }
+  .title-grad {
+    background: linear-gradient(95deg, #5AC8FA 0%, #007AFF 40%, #FF2D55 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
