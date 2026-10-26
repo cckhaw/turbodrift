@@ -126,6 +126,12 @@ export async function flushPending(): Promise<void> {
   writePending(keep);
 }
 
+/** Your own best lap on a track, from this device. */
+export function bestLocalLap(world: number, seed: number): number | null {
+  const laps = loadLocal().filter((s) => s.world === world && s.seed === seed).map((s) => s.lapMs);
+  return laps.length ? Math.min(...laps) : null;
+}
+
 export async function saveScore(e: Omit<ScoreEntry, 'you' | 'at'>): Promise<void> {
   const all = loadLocal();
   all.push({ ...e, you: true, at: Date.now() });
