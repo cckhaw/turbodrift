@@ -37,11 +37,12 @@ export function saveKart(id: string): void {
   }
 }
 
-export type Mode = 'race' | 'trial';
+export type Mode = 'race' | 'trial' | 'practice';
 const MODE_KEY = 'turbodrift.mode';
 export function loadMode(): Mode {
   try {
-    return localStorage.getItem(MODE_KEY) === 'trial' ? 'trial' : 'race';
+    const m = localStorage.getItem(MODE_KEY);
+    return m === 'trial' || m === 'practice' ? m : 'race';
   } catch {
     return 'race';
   }

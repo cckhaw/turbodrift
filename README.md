@@ -22,7 +22,7 @@ A mobile-first arcade kart racer that runs in the browser: pseudo-3D drift racin
 ```bash
 npm install
 npm run dev        # http://localhost:5173 (also reachable from your phone on the same network)
-npm test           # 93 tests
+npm test           # 101 tests
 npm run build      # typecheck + production build
 ```
 
@@ -39,6 +39,8 @@ In `npm run dev` there is no API: the leaderboard falls back to this device's ti
 
 The kart accelerates automatically.
 
+**New here?** The first time you press Race you're offered a one-minute guided tutorial, and the menu shows a *Learn to drive* card until you've done or skipped it. You can replay it any time from **Settings → Help → Replay the tutorial**, read the quick reference from the **?** button on the menu (or *Controls guide* in Settings), or just wander around in **Practice** mode.
+
 **Drifting.** Hold DRIFT while steering above a quarter of full lock at more than ~35 % speed. The ring around the button fills as the charge builds (faster in tighter turns, and fastest in the Phantom): at the first level it turns blue and releasing gives a 0.95 s mini-turbo, at the second it turns pink and you get a 1.7 s turbo. While drifting you turn harder and the track's centrifugal push is cut by ~60 %; steering with the drift tightens the arc, steering against it widens it. The worlds get harder to take without drifting: world 1 is forgiving, world 3's hairpins are very hard without it.
 
 **On the road.**
@@ -51,9 +53,13 @@ The kart accelerates automatically.
 ## Features
 
 ### Game modes
+- **Practice**: endless solo driving on the track you've selected, with item boxes and no countdown. Nothing is timed, recorded or unlocked, so it's the place to get used to the controls, the HUD and the items.
 - **Race**: 3 laps against 5 bots (CyberBot-01, NeonViper, GlitchRider, ByteBlaze, ChromeFang, PulseNova pool), with item boxes. Finishing in the top 3 unlocks the next world.
 - **Time Trial**: solo, no bots or items, racing your own best-lap **ghost** for that kart. This is the mode whose times go on the global leaderboard.
 - **Daily challenge**: one track per UTC day for everyone (the world rotates 1 → 2 → 3, the seed is derived from the date), played as a Time Trial. Because everyone gets the same seed, the leaderboard for that seed *is* the daily board. The menu card shows your best, the time until the reset, a ✅ once done and a 🔥 streak of consecutive days.
+
+### Tutorial
+A guided lap on an easy fixed track (world 1, seed 4242), run in endless Practice mode with lesson cards on top. The cards watch what you actually do and move on when you've done it: **steer** left and right → **drift** through a turn (hold DRIFT) → **let go to boost** (a boost pad doesn't count, it has to come from releasing a drift) → **grab an item** and use it. Every lesson has a *Skip this step* link and the whole thing can be dismissed with the × (you stay on the practice track). The controls glow when they're the thing to use. The step logic is a pure state machine (`src/utils/tutorial.ts`) and a test drives the real engine through all four lessons on the tutorial track.
 
 ### Worlds and progression
 
@@ -99,10 +105,11 @@ Apple-style glass interface: frosted panels (`rgba(255,255,255,0.08)` with a 28 
 
 ## Settings
 
-Gear icon on the menu, or **Settings** in the pause menu:
+Gear icon on the menu, or **Settings** in the pause menu (the **?** button next to it opens the controls guide):
 
 | Section | Options |
 |---|---|
+| Help | replay the tutorial, controls guide, practice mode (the tutorial and practice are disabled while a race is in progress) |
 | Audio | sound on/off, music volume, effects volume |
 | Controls | steering sensitivity (how far to drag for full lock), vibration |
 | Graphics | battery saver (lower render resolution), screen shake |
@@ -134,6 +141,7 @@ There is no `.env` to create for local play.
 | `turbodrift.scores.v1` | your local lap records (up to 200) |
 | `turbodrift.ghost.v2.<world>.<seed>.<kart>` | best-lap ghost |
 | `turbodrift.daily.v1` | completed daily-challenge dates |
+| `turbodrift.tutorial.v1` | whether the tutorial was completed or skipped (controls the first-race prompt) |
 | `turbodrift.kart`, `turbodrift.mode`, `turbodrift.name`, `turbodrift.haptics` | last choices |
 | `turbodrift.client` | random device id used for the leaderboard (not personal data) |
 | `turbodrift.pending.v1` | time trials waiting to be submitted |
@@ -197,7 +205,7 @@ npm test             # vitest run
 npm run typecheck
 ```
 
-93 tests in `tests/` (they also run in CI):
+101 tests in `tests/` (they also run in CI):
 
 | File | Covers |
 |---|---|
@@ -206,6 +214,7 @@ npm run typecheck
 | `api` | replay verification (exact reproduction, tampering, malformed or unfinished recordings), server-computed times, throttling, best-time upsert, board queries |
 | `save`, `cloud` | save validation, sync codes, forward-only merging, device A → device B restore through the real API logic |
 | `queue` | offline queue: retries, ordering, throttling, concurrency, expiry, regression for the launch-time flush |
+| `tutorial` | the lesson state machine (including that a boost pad can't pass the boost lesson), first-run flag, practice mode being endless and leaving no records, and every lesson being completable on the tutorial track |
 | `ghost`, `daily`, `items`, `format-share`, `cleanup` | ghosts per kart and settings, daily rotation and streaks, item odds and kart stats, scorecard text, deployment selection |
 
 API tests run against an in-memory Postgres ([PGlite](https://pglite.dev)), so no database is needed.

@@ -49,7 +49,8 @@ export interface EngineOptions {
   seed: number;
   onHud: (h: HudSnapshot) => void;
   onFinish: (r: RaceResult) => void;
-  mode?: 'race' | 'trial';
+  /** race: bots + items · trial: solo, verified for the leaderboard · practice: solo, items, endless, nothing recorded */
+  mode?: 'race' | 'trial' | 'practice';
   kart?: string;
 }
 
@@ -114,7 +115,8 @@ export class Engine {
   // karts, items, hazards thrown by cars
   private settings: Settings;
   private kart: KartSpec;
-  private mode: 'race' | 'trial';
+  private mode: 'race' | 'trial' | 'practice';
+  private countdownLen = COUNTDOWN;
   private itemRng: Rng;
   private itemRollT = 0;
   private boxTaken = new Map<string, number>();
@@ -129,12 +131,13 @@ export class Engine {
     this.backdrop = makeBackdrop(() => r.next());
     this.settings = loadSettings();
     this.mode = o.mode ?? 'race';
+    if (this.mode === 'practice') this.countdownLen = 0.6; // no countdown, just GO
     this.kart = kartById(o.kart ?? KARTS[0].id);
     this.itemRng = new Rng(hashSeed(o.world, o.seed, 555));
     this.player = this.makeCar(0, 'YOU', this.kart.color, this.kart.accent, true);
     this.player.shape = this.kart.id as Car['shape'];
     this.setupGrid(r);
-    this.ghost = loadGhost(o.world, o.seed, this.kart.id);
+    this.ghost = this.mode === 'practice' ? null : loadGhost(o.world, o.seed, this.kart.id);
     if (this.ghost) this.ghostCar = { ...this.makeCar(99, 'BEST', '#ffffff', '#ffffff', false), ghost: true };
     this.resize();
     if (typeof ResizeObserver !== 'undefined') {
@@ -149,7 +152,7 @@ export class Engine {
   }
 
   private setupGrid(r: Rng) {
-    if (this.mode === 'trial') {
+    if (this.mode !== 'race') {
       this.player.dist = -700;
       this.player.x = 0;
       this.cars.push(this.player);
@@ -265,7 +268,7 @@ export class Engine {
     if (this.toastT > 0 && (this.toastT -= dt) <= 0) this.toast = null;
 
     if (this.state === 'countdown') {
-      const left = COUNTDOWN - this.time;
+      const left = this.countdownLen - this.time;
       const n = Math.max(0, Math.ceil(left - 0.6));
       if (n !== this.lastCount) {
         this.lastCount = n;
@@ -427,7 +430,7 @@ export class Engine {
   }
 
   private stepGhost(dt: number) {
-    if (this.state !== 'racing') return;
+    if (this.state !== 'racing' || this.mode === 'practice') return;
     this.recT += dt;
     while (this.recT >= GHOST_DT) {
       this.recT -= GHOST_DT;
@@ -730,6 +733,19 @@ export class Engine {
 
   private trackLaps() {
     const p = this.player;
+    if (this.mode === 'practice') {
+      // endless: count laps, but never finish, record a ghost or produce a result
+      const n = Math.max(1, Math.floor(p.dist / this.track.length) + 1);
+      if (n > this.playerLap && this.state === 'racing') {
+        this.lapT = 0;
+        this.playerLap = n;
+        synth.lap();
+        haptic.lap();
+        this.say(`LAP ${n}`);
+      }
+      p.lap = n;
+      return;
+    }
     const lap = clamp(Math.floor(p.dist / this.track.length) + 1, 1, LAPS + 1);
     if (lap > this.playerLap && this.state === 'racing') {
       const lapMs = this.lapT * 1000;
@@ -768,7 +784,7 @@ export class Engine {
     const p = this.player;
     const remaining = (c: Car) => Math.max(0, LAPS * this.track.length - c.dist) / Math.max(c.speed, this.wd.maxSpeed * 0.5);
     return {
-      mode: this.mode,
+      mode: this.mode === 'trial' ? 'trial' : 'race', // practice never produces a result
       kart: this.kart.id,
       world: this.o.world,
       seed: this.o.seed,
@@ -805,7 +821,7 @@ export class Engine {
       driftLevel: this.driftLvl,
       driftCharge: this.drifting ? (this.driftLvl === 0 ? this.driftCharge / 0.9 : this.driftLvl === 1 ? (this.driftCharge - 0.9) / 1.2 : 1) : 0,
       boosting: this.boostT > 0,
-      countdown: this.state === 'countdown' ? Math.max(0, Math.ceil(COUNTDOWN - this.time - 0.6)) : null,
+      countdown: this.state === 'countdown' ? Math.max(0, Math.ceil(this.countdownLen - this.time - 0.6)) : null,
       standings: ranked.map((c) => ({ name: c.name, color: c.color, you: c.isPlayer, gap: (leaderDist - c.dist) / 1000 })),
       toast: this.toast,
       fallen: this.fallT > 0,
@@ -965,7 +981,7 @@ export class Engine {
           const cx = a.x + (a.scale * off * roadW * W) / 2;
           drawHazard(c, hzd, cx, a.y, u, roadW, this.time, seg.clip);
         }
-        if (seg.boxes && this.mode === 'race') {
+        if (seg.boxes && this.mode !== 'trial') {
           for (let k = 0; k < seg.boxes.length; k++) {
             if ((this.boxTaken.get(`${seg.index}:${k}`) ?? 0) > this.time) continue;
             const cx = a.x + (a.scale * BOX_OFFSETS[k] * roadW * W) / 2;

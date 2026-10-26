@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, Dices, Link2, Lock, Play, Settings, Trophy, Volume2, VolumeX } from 'lucide-react';
+import { Check, CircleHelp, Dices, GraduationCap, Link2, Lock, Play, Settings, Trophy, Volume2, VolumeX } from 'lucide-react';
 import { KARTS, type Mode } from '../game/karts';
 import KartPreview from './KartPreview';
 import { WORLDS } from '../game/worlds';
@@ -29,6 +29,10 @@ interface Props {
   onBoard: () => void;
   onMute: () => void;
   onSettings: () => void;
+  onHowTo: () => void;
+  onTutorial: () => void;
+  /** first-time player who hasn't done or skipped the tutorial */
+  newPlayer: boolean;
 }
 
 const DIFF_COLOR = ['bg-apple-green/20 text-apple-green', 'bg-apple-yellow/20 text-apple-yellow', 'bg-apple-pink/20 text-apple-pink'];
@@ -55,6 +59,9 @@ export default function Menu(p: Props) {
         <div className="flex items-center justify-between">
           <span className="rounded-pill bg-glass px-3 py-1 text-xs font-medium tracking-wide text-white/70">v1 · ARCADE</span>
           <div className="flex gap-2">
+          <button aria-label="How to play" onClick={p.onHowTo} className="glass flex h-10 w-10 items-center justify-center !rounded-pill active:scale-95">
+            <CircleHelp size={18} />
+          </button>
           <button aria-label="Settings" onClick={p.onSettings} className="glass flex h-10 w-10 items-center justify-center !rounded-pill active:scale-95">
             <Settings size={18} />
           </button>
@@ -69,6 +76,17 @@ export default function Menu(p: Props) {
           <h1 className="title-grad mt-1 text-5xl font-extrabold leading-none tracking-tight">Neon Circuit</h1>
           <p className="mt-3 text-[15px] text-white/60">Drift. Boost. Beat five rival bots in 3 laps.</p>
         </header>
+
+        {p.newPlayer && (
+          <button onClick={p.onTutorial} className="mt-5 flex w-full items-center gap-3 rounded-squircle border border-apple-blue/50 bg-apple-blue/20 p-4 text-left shadow-neon-blue transition active:scale-[0.98]">
+            <GraduationCap size={28} className="shrink-0 text-arcade-cyan" />
+            <span className="min-w-0 flex-1">
+              <span className="block font-semibold">New here? Learn to drive</span>
+              <span className="block text-xs text-white/65">A one-minute guided lap: steering, drifting, boosting and items.</span>
+            </span>
+            <span className="shrink-0 rounded-pill bg-apple-blue px-3 py-1.5 text-xs font-semibold">Start</span>
+          </button>
+        )}
 
         {(() => {
           void p.dailyTick;
@@ -187,16 +205,21 @@ export default function Menu(p: Props) {
         </section>
 
         <div className="mt-4 flex rounded-pill bg-black/30 p-1 text-sm font-semibold" role="tablist" aria-label="Mode">
-          {(['race', 'trial'] as const).map((m) => (
+          {(['race', 'trial', 'practice'] as const).map((m) => (
             <button key={m} role="tab" aria-selected={p.mode === m} onClick={() => p.onMode(m)} className={`flex-1 rounded-pill py-2 transition ${p.mode === m ? 'bg-apple-blue text-white' : 'text-white/60'}`}>
-              {m === 'race' ? 'Race · bots + items' : 'Time Trial · solo'}
+              {m === 'race' ? 'Race' : m === 'trial' ? 'Time Trial' : 'Practice'}
             </button>
           ))}
         </div>
+        <p className="mt-2 px-2 text-center text-xs text-white/50">
+          {p.mode === 'race' && 'Three laps against five bots, with item boxes. Finish top 3 to unlock the next world.'}
+          {p.mode === 'trial' && 'Solo against your ghost. Times are verified and go on the global leaderboard.'}
+          {p.mode === 'practice' && 'Endless free driving with item boxes. No timing, no results. Try the controls and the UI.'}
+        </p>
 
         <div className="sticky bottom-0 mt-auto flex gap-3 pt-4">
           <button onClick={p.onRace} className="btn-primary flex flex-1 items-center justify-center gap-2 text-lg">
-            <Play size={20} fill="currentColor" /> {p.mode === 'race' ? 'Race' : 'Start trial'}
+            <Play size={20} fill="currentColor" /> {p.mode === 'race' ? 'Race' : p.mode === 'trial' ? 'Start trial' : 'Start practice'}
           </button>
           <button onClick={p.onBoard} className="btn-glass flex items-center justify-center gap-2">
             <Trophy size={18} /> Board
