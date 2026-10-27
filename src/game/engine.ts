@@ -1,5 +1,5 @@
 import { synth } from '../audio/synth.js';
-import { FIXED_DT, ReplayRecorder, encodeRuns, quantizeSteer, type InputRun, type Replay } from './replay.js';
+import { FIXED_DT, MAX_REPLAY_ITEMS, ReplayRecorder, encodeRuns, quantizeSteer, type InputRun, type Replay } from './replay.js';
 import { Rng, hashSeed } from '../utils/rng.js';
 import { haptic } from '../utils/haptics.js';
 import { loadSettings, type Settings } from '../utils/settings.js';
@@ -9,7 +9,10 @@ import { generateTrack } from './track.js';
 import { lookAhead } from './lookahead.js';
 import { KARTS, kartById, type KartSpec } from './karts.js';
 import { BOX_OFFSETS, BOX_RESPAWN, OIL_LIFE, SHIELD_TIME, SPIN_TIME, rollItem } from './items.js';
-import { drawBackdrop, drawHazard, drawItemBox, drawKart, drawProp, drawScenery, lerp, makeBackdrop, mix, type Backdrop } from './draw.js';
+import { drawHazard, drawItemBox, drawKart, drawProp, lerp, mix } from './draw.js';
+import { gfxState } from './gfx.js';
+import { drawBackdrop, drawGround, drawRoadside, makeBackdrop, type Backdrop } from './scene.js';
+import { drawScenery } from './scenery.js';
 import type { Car, HudSnapshot, RaceResult, Segment, Track, WorldConfig } from './types.js';
 
 const FOV = 80;
@@ -18,6 +21,7 @@ const PLAYER_Z = 3000;
 const CAM_H = 2500;
 const DRAW_DIST = 130;
 const KART_W = 900; // world units
+const KART_DRAW = 1.22; // karts are drawn a little larger than their hit box so they read well on a phone
 const KART_LEN = 700;
 const HORIZON = 0.37;
 const FOG_DENSITY = 4;
@@ -77,6 +81,11 @@ export class Engine {
   private finishT = 0;
   private reported = false;
   private bgScroll = 0;
+  /** trimmed decoration: Battery saver, or switched on automatically when frames run slow */
+  private lite = false;
+  private slowFrames = 0;
+  private frameSum = 0;
+  private frameCount = 0;
   private particles: Particle[] = [];
   private shake = 0;
   private toast: { text: string; id: number } | null = null;
@@ -110,6 +119,13 @@ export class Engine {
   private recorder = new ReplayRecorder();
   private replayRuns: InputRun[] | null = null;
   private replayIdx = 0;
+  private replayStep = 0;
+  private replayItems: number[] = [];
+  private replayItemIdx = 0;
+  private itemPress = false;
+  private assistT = 0;
+  private assistOn = false;
+  private assistDir = 0;
   private replayLeft = 0;
   private finalResult: RaceResult | null = null;
 
@@ -193,6 +209,7 @@ export class Engine {
     this.last = performance.now();
     const tick = (now: number) => {
       this.raf = requestAnimationFrame(tick);
+      this.watchFrameRate((now - this.last) / 1000);
       const dt = Math.min(0.1, (now - this.last) / 1000);
       this.last = now;
       if (!this.paused) {
@@ -211,7 +228,19 @@ export class Engine {
     this.raf = requestAnimationFrame(tick);
   }
 
+  /** If a couple of seconds of frames average slower than ~38 fps, drop the extra decoration for the rest of the session. */
+  private watchFrameRate(raw: number): void {
+    if (this.lite || this.paused || raw > 0.25 || this.state === 'countdown') return;
+    this.frameSum += raw;
+    if (++this.frameCount < 90) return;
+    this.slowFrames = this.frameSum / this.frameCount > 1 / 38 ? this.slowFrames + 1 : 0;
+    this.frameSum = 0;
+    this.frameCount = 0;
+    if (this.slowFrames >= 2) this.lite = true;
+  }
+
   destroy(): void {
+    gfxState.lite = false;
     if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(this.raf);
     this.resizeObs?.disconnect();
     synth.stopEngine();
@@ -254,13 +283,25 @@ export class Engine {
         this.replayIdx++;
         this.replayLeft = this.replayRuns[this.replayIdx].steps;
       }
+      while (this.replayItemIdx < this.replayItems.length && this.replayItems[this.replayItemIdx] <= this.replayStep) {
+        if (this.replayItems[this.replayItemIdx++] === this.replayStep) this.tryUseItem();
+      }
+      this.replayStep++;
       return;
     }
     const q = quantizeSteer(this.input.steer);
     this.cmd.steer = q / 127;
-    this.cmd.drift = this.input.drift;
+    // the effective drift (held button or assist) is what gets recorded, so a replay needs no knowledge of the assist
+    this.cmd.drift = this.input.drift || this.driftAssist(dt);
     if (Math.abs(dt - FIXED_DT) > 1e-9) this.recorder.valid = false;
-    this.recorder.push(q, this.input.drift);
+    if (this.itemPress) {
+      // the press is applied inside the fixed step, so a replay can apply it at exactly the same step
+      this.itemPress = false;
+      if (this.recorder.items.length < MAX_REPLAY_ITEMS) this.recorder.items.push(this.recorder.total);
+      else this.recorder.valid = false;
+      this.tryUseItem();
+    }
+    this.recorder.push(q, this.cmd.drift);
   }
 
   private update(dt: number) {
@@ -519,23 +560,71 @@ export class Engine {
     }
   }
 
-  /** Time-trial recording for server verification; null if it can't be replayed exactly. */
+  /**
+   * Drift assist for touch play: steering hard through a real bend for a moment starts a drift, and steering back
+   * (or leaving the bend) lets go, which pays out the boost. Off unless the player enabled it.
+   */
+  private driftAssist(dt: number): boolean {
+    if (!this.settings.driftAssist || this.state !== 'racing') {
+      this.assistT = 0;
+      return (this.assistOn = false);
+    }
+    const steer = this.cmd.steer;
+    const p = this.player;
+    const curve = this.seg(p.dist).curve;
+    if (this.assistOn) {
+      // keep drifting while still steering the same way and the player is still going fast enough
+      if (steer * this.assistDir < 0.35 || p.speed < this.wd.maxSpeed * this.kart.speed * 0.3 || this.fallT > 0 || p.spinT > 0) this.assistOn = false;
+      return this.assistOn;
+    }
+    const inBend = Math.abs(curve) >= 0.8 && Math.sign(curve) === Math.sign(steer);
+    if (Math.abs(steer) >= 0.9 && inBend && p.speed > this.wd.maxSpeed * this.kart.speed * 0.55 && this.fallT <= 0 && p.spinT <= 0) {
+      this.assistT += dt;
+      if (this.assistT >= 0.18) {
+        this.assistOn = true;
+        this.assistDir = Math.sign(steer);
+        this.assistT = 0;
+      }
+    } else this.assistT = 0;
+    return this.assistOn;
+  }
+
+  /** Race or time-trial recording for server verification; null if it can't be replayed exactly. */
   getReplay(): Replay | null {
-    if (this.mode !== 'trial' || !this.recorder.valid || !this.finalResult || this.replayRuns) return null;
-    return { v: 1, world: this.o.world, seed: this.o.seed, kart: this.kart.id, steps: this.recorder.total, data: encodeRuns(this.recorder.runs) };
+    if (this.mode === 'practice' || !this.recorder.valid || !this.finalResult || this.replayRuns) return null;
+    const r: Replay = { v: 1, world: this.o.world, seed: this.o.seed, kart: this.kart.id, steps: this.recorder.total, data: encodeRuns(this.recorder.runs) };
+    if (this.mode === 'race') {
+      r.mode = 'race';
+      r.items = this.recorder.items;
+    }
+    return r;
   }
 
   /** Server side: drive the engine from recorded inputs (held at the last input once they run out). */
-  runReplay(runs: InputRun[], maxSteps: number): RaceResult | null {
+  runReplay(runs: InputRun[], maxSteps: number, items: number[] = []): RaceResult | null {
     this.replayRuns = runs;
+    this.replayItems = items;
+    this.replayItemIdx = 0;
+    this.replayStep = 0;
     this.replayIdx = 0;
     this.replayLeft = runs[0].steps;
     for (let i = 0; i < maxSteps && !this.finalResult; i++) this.update(FIXED_DT);
     return this.finalResult;
   }
 
-  /** Player taps the item button. */
+  /** Pick up settings changed from the pause menu (drift assist, shake, volumes). */
+  refreshSettings(): void {
+    this.settings = loadSettings();
+    synth.setVolumes(this.settings.music, this.settings.sfx);
+  }
+
+  /** Player taps the item button; it takes effect at the start of the next simulation step. */
   useItem(): void {
+    if (this.state === 'racing' && this.mode === 'race' && !this.replayRuns) this.itemPress = true;
+    else if (this.mode !== 'race') this.tryUseItem();
+  }
+
+  private tryUseItem(): void {
     const p = this.player;
     if (this.state !== 'racing' || !p.item || this.itemRollT > 0 || this.fallT > 0 || p.spinT > 0) return;
     this.activate(p);
@@ -878,9 +967,9 @@ export class Engine {
     c.save();
     if (this.shake > 0 && this.settings.shake) c.translate((Math.random() - 0.5) * this.shake * 10, (Math.random() - 0.5) * this.shake * 8);
 
+    gfxState.lite = this.lite || this.settings.quality === 'low';
     drawBackdrop(c, W, H, hz, wd, this.backdrop, this.bgScroll, this.time);
-    c.fillStyle = wd.grass[0];
-    c.fillRect(-20, hz, W + 40, H - hz + 20);
+    const groundFill = drawGround(c, W, H, hz, wd, this.time);
 
     const camPos = mod(p.dist - PLAYER_Z, track.length);
     const base = segs[Math.floor(camPos / SEG_LENGTH)];
@@ -923,14 +1012,10 @@ export class Engine {
       const a = seg.p1.screen;
       const b = seg.p2.screen;
       const alt = Math.floor(seg.index / RUMBLE_LEN) % 2;
-      // ground band
-      c.fillStyle = wd.grass[alt];
+      // ground band, with a faint alternating tint so the speed reads, then the pavement / rails beside the road
+      c.fillStyle = groundFill;
       c.fillRect(-20, b.y, W + 40, a.y - b.y + 1);
-      // lava / sky glow bands off the edge
-      if (wd.fallOff) {
-        c.fillStyle = alt ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.05)';
-        c.fillRect(-20, b.y, W + 40, a.y - b.y + 1);
-      }
+      drawRoadside(c, wd, a, b, alt, seg.index, (x1, y1, x2, y2, x3, y3, x4, y4, color) => this.poly(x1, y1, x2, y2, x3, y3, x4, y4, color));
       const rw1 = a.w / 6;
       const rw2 = b.w / 6;
       const lw1 = a.w / 40;
@@ -984,7 +1069,7 @@ export class Engine {
         const u = (a.scale * W) / 2;
         for (const s of seg.scenery) {
           const cx = a.x + (a.scale * s.offset * roadW * W) / 2;
-          drawScenery(c, s, cx, a.y, u, wd, seg.clip, this.time);
+          drawScenery(c, s, cx, a.y, u, wd, seg.clip, this.time, W, H);
         }
         if (seg.hazard) {
           const hzd = seg.hazard;
@@ -1011,7 +1096,7 @@ export class Engine {
           const sc = lerp(seg.p1.screen.scale, seg.p2.screen.scale, pct);
           const sx = lerp(seg.p1.screen.x, seg.p2.screen.x, pct) + (sc * car.x * roadW * W) / 2;
           const sy = lerp(seg.p1.screen.y, seg.p2.screen.y, pct);
-          const kw = (sc * KART_W * W) / 2;
+          const kw = (sc * KART_W * KART_DRAW * W) / 2;
           drawKart(c, sx, sy, kw, car.color, car.accent, { tilt: 0, drift: 0, boost: !car.ghost && (car.boostT > 0 || car.speed > this.wd.maxSpeed * 1.05), flicker: Math.random(), fall: 0, blink: !!car.ghost, spin: car.spinT > 0 ? 1 - car.spinT / SPIN_TIME : 0, shield: car.shieldT > 0, shape: car.shape }, seg.clip);
           if (kw > 26 && kw < W * 0.2 && sy < H * 0.8 && !car.ghost) {
             c.font = `600 ${Math.max(9, Math.round(kw * 0.17))}px -apple-system, system-ui, sans-serif`;
@@ -1038,7 +1123,7 @@ export class Engine {
     const W = this.W;
     const sc = CAM_DEPTH / PLAYER_Z;
     const ground = this.H * HORIZON + (sc * CAM_H * this.H) / 2;
-    const kw = (sc * KART_W * W) / 2;
+    const kw = (sc * KART_W * KART_DRAW * W) / 2;
     const bounce = Math.sin(this.time * 38) * (this.player.speed / this.wd.maxSpeed) * 0.8 * (this.W / 400);
     const accent = this.driftLvl === 2 ? '#ff2d55' : this.driftLvl === 1 ? '#5ac8fa' : this.player.accent;
     drawKart(

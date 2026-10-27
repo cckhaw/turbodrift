@@ -5,6 +5,7 @@ import KartPreview from './KartPreview';
 import { WORLDS } from '../game/worlds';
 import type { Progress } from '../utils/progress';
 import { bestLocalLap } from '../utils/leaderboard';
+import WorldArt from './WorldArt';
 import { dailyDone, dailyStreak, formatCountdown, isDaily, msUntilNextDaily, type Daily } from '../utils/daily';
 import { formatTime } from '../utils/format';
 import { randomSeed } from '../utils/rng';
@@ -37,9 +38,9 @@ interface Props {
 
 const DIFF_COLOR = ['bg-apple-green/20 text-apple-green', 'bg-apple-yellow/20 text-apple-yellow', 'bg-apple-pink/20 text-apple-pink'];
 const CARD_BG = [
-  'linear-gradient(160deg,#0b4f8f,#06142e 70%)',
-  'linear-gradient(160deg,#6a2fc2,#140a45 70%)',
-  'linear-gradient(160deg,#a8310b,#120202 70%)',
+  'linear-gradient(170deg,#1c1f7a,#2b2a8f 40%,#a8327a)',
+  'linear-gradient(170deg,#3a1a8c,#8a3fd1 45%,#ff9ad5)',
+  'linear-gradient(170deg,#2a0603,#7a1d08 45%,#ff7a2a)',
 ];
 
 export default function Menu(p: Props) {
@@ -131,9 +132,10 @@ export default function Menu(p: Props) {
                 disabled={locked}
                 onClick={() => p.onWorld(wd.id)}
                 style={{ background: locked ? undefined : CARD_BG[i] }}
-                className={`glass relative w-full overflow-hidden p-4 text-left transition active:scale-[0.98] ${sel ? 'ring-2 ring-apple-blue shadow-neon-blue' : ''} ${locked ? 'opacity-55' : ''}`}
+                className={`glass relative w-full overflow-hidden p-4 pb-[58px] text-left transition active:scale-[0.98] ${sel ? 'ring-2 ring-apple-blue shadow-neon-blue' : ''} ${locked ? 'opacity-55' : ''}`}
               >
-                <div className="flex items-start justify-between gap-3">
+                <WorldArt world={wd.id} dim={locked} />
+                <div className="relative flex items-start justify-between gap-3">
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="text-2xl">{wd.emoji}</span>

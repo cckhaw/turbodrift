@@ -1,4 +1,4 @@
-import { Rng } from '../utils/rng.js';
+import { Rng, hashSeed } from '../utils/rng.js';
 import { SEG_LENGTH, WORLDS } from './worlds.js';
 import type { Hazard, Pad, Scenery, Segment, Track } from './types.js';
 
@@ -112,6 +112,10 @@ export function generateTrack(worldId: number, seed: number): Track {
     i += rng.int(200, 300);
   }
 
+  // Cosmetic dressing. It has its own random stream so the layout rolled above (and every replay and ghost that
+  // depends on it) is unchanged by anything drawn here.
+  decorate(segs, worldId, hashSeed(seed, worldId, 0xdec0));
+
   // racing line: lean toward the inside of upcoming curves, smoothed
   const raw = segs.map((_, k) => {
     let c = 0;
@@ -125,6 +129,34 @@ export function generateTrack(worldId: number, seed: number): Track {
   });
 
   return { segments: segs, length: N * SEG_LENGTH, line, world: worldId, seed };
+}
+
+/** Street furniture and set pieces: lamps down both sides, crowds and palms in the city, banner arches and rings. */
+function decorate(segs: Segment[], worldId: number, seed: number) {
+  const art = new Rng(seed);
+  const N = segs.length;
+  const add = (i: number, s: Scenery) => segs[((i % N) + N) % N].scenery.push(s);
+  const lampKind = worldId === 3 ? 'torch' : 'lamp';
+  const every = worldId === 3 ? 7 : 9;
+  for (let i = 5; i < N; i += every) {
+    for (const side of [-1, 1]) add(i + (side > 0 ? 0 : 3), { kind: lampKind, offset: side * (worldId === 1 ? 1.36 : 1.3), size: 1, hue: art.next() });
+  }
+  if (worldId === 1) {
+    for (let i = 0; i < N; i++) {
+      if (art.chance(0.045)) add(i, { kind: 'crowd', offset: art.sign() * art.range(1.9, 2.2), size: art.range(0.9, 1.3), hue: art.next() });
+      if (art.chance(0.03)) add(i, { kind: 'palm', offset: art.sign() * art.range(2.2, 3), size: art.range(0.9, 1.4), hue: art.next() });
+    }
+  }
+  // set pieces over the road: a START arch on the line, then something every few hundred segments
+  add(4, { kind: 'arch', offset: 0, size: 1, hue: 0.2, label: 'START' });
+  const span = worldId === 1 ? (['arch', 'bunting'] as const) : worldId === 2 ? (['ring', 'ring'] as const) : (['gantry', 'gantry'] as const);
+  const labels = worldId === 1 ? ['TURBO DRIFT', 'NEON CITY', 'DRIFT KING', 'GO GO GO'] : worldId === 3 ? ['OBSIDIAN CORE', 'MAGMA RUN', 'KEEP COOL'] : [''];
+  let n = 0;
+  for (let i = art.int(160, 240); i < N - 80; i += art.int(220, 340)) {
+    const kind = span[n % span.length];
+    add(i, { kind, offset: 0, size: 1, hue: art.next(), label: kind === 'ring' ? undefined : labels[n % labels.length] });
+    n++;
+  }
 }
 
 export { ease, easeIn, easeOut };

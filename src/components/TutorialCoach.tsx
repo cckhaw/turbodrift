@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ChevronRight, X } from 'lucide-react';
 import { ITEM_INFO } from '../game/items';
 import type { HudSnapshot } from '../game/types';
+import { loadSettings } from '../utils/settings';
 import { advanceTutorial, initialTutorial, markTutorialSeen, skipStep, TUTORIAL_STEPS, type TutorialState } from '../utils/tutorial';
 
 interface Props {
@@ -16,7 +17,7 @@ const COPY = {
   drift: { icon: '🌀', title: 'Drift through a turn', body: 'When a bend comes up, steer into it and hold the DRIFT button.', key: 'Keyboard: hold Space' },
   boost: { icon: '🚀', title: 'Let go to boost', body: 'Keep holding until the ring around DRIFT turns blue (then pink), then release for a turbo.', key: 'Longer drift = longer boost' },
   item: { icon: '🎁', title: 'Grab an item', body: 'Drive through a glowing ? box, then tap the item button.', key: 'Keyboard: E or Enter' },
-  done: { icon: '🏁', title: 'You’re ready to race!', body: 'Yellow chevrons on the road are boost pads. Finish in the top 3 to unlock new worlds, and use Time Trial to set times for the global leaderboard.', key: '' },
+  done: { icon: '🏁', title: 'You’re ready to race!', body: 'Yellow chevrons on the road are boost pads. Finish in the top 3 to unlock new worlds. Your best laps in Races and Time Trials go on the global leaderboards.', key: '' },
 } as const;
 
 /** A ring that pulses around a control to say "this one". Positions mirror the layout in RaceScreen. */
@@ -49,10 +50,11 @@ export default function TutorialCoach({ hud, steer, onKeepPractising, onExit }: 
     if (step === 'done') markTutorialSeen('done');
   }, [step]);
 
+  const { touchScheme, driftAssist } = loadSettings();
   const c = COPY[step];
   const idx = TUTORIAL_STEPS.indexOf(step);
   const holding = hud?.item != null;
-  const body = step === 'item' && holding ? `You’ve got ${ITEM_INFO[hud!.item!].emoji} ${ITEM_INFO[hud!.item!].label}! Tap the item button to use it.` : c.body;
+  const body = step === 'item' && holding ? `You’ve got ${ITEM_INFO[hud!.item!].emoji} ${ITEM_INFO[hud!.item!].label}! Tap the item button to use it.` : (step === 'steer' && touchScheme === 'buttons' ? 'Hold the left and right arrow pads. The kart speeds up by itself.' : step === 'drift' && driftAssist ? 'When a bend comes up, steer hard into it and the kart starts drifting. You can also hold the DRIFT button.' : c.body);
 
   return (
     <>

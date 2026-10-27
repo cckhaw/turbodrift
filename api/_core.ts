@@ -12,10 +12,13 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** A real race is 3 laps, so one device can't legitimately finish two races this close together. */
 const THROTTLE_SECONDS = 45;
 
-let ready: Promise<void> | null = null;
+/** schema setup runs once per connection/function (so a test database or a fresh deploy gets its own) */
+const readyBy = new WeakMap<Sql, Promise<void>>();
 
 export function ensureSchema(sql: Sql): Promise<void> {
-  ready ??= (async () => {
+  const known = readyBy.get(sql);
+  if (known) return known;
+  const ready = (async () => {
     await sql`create table if not exists scores (
       id          bigint generated always as identity primary key,
       client_id   uuid        not null,
@@ -28,6 +31,10 @@ export function ensureSchema(sql: Sql): Promise<void> {
       updated_at  timestamptz not null default now(),
       unique (client_id, world, seed)
     )`;
+    // races and time trials rank separately (older rows are all time trials)
+    await sql`alter table scores add column if not exists mode text not null default 'trial'`;
+    await sql`alter table scores drop constraint if exists scores_client_id_world_seed_key`;
+    await sql`create unique index if not exists scores_client_track_mode_idx on scores (client_id, world, seed, mode)`;
     await sql`create index if not exists scores_board_idx on scores (world, seed, lap_ms)`;
     await sql`create index if not exists scores_world_idx on scores (world, lap_ms)`;
     await sql`create table if not exists saves (
@@ -39,9 +46,10 @@ export function ensureSchema(sql: Sql): Promise<void> {
     )`;
     await sql`create index if not exists saves_ip_idx on saves (ip_hash, created_at)`;
   })().catch((e) => {
-    ready = null; // retry on the next request
+    readyBy.delete(sql); // retry on the next request
     throw e;
   });
+  readyBy.set(sql, ready);
   return ready;
 }
 
@@ -53,7 +61,7 @@ export interface Result {
 const bad = (error: string, status = 400): Result => ({ status, body: { error } });
 
 /** What the verifier must return; see src/game/verify.ts. */
-export type Verifier = (replay: unknown) => { ok: false; error: string } | { ok: true; world: number; seed: number; lapMs: number; totalMs: number; lapTimes: number[] };
+export type Verifier = (replay: unknown) => { ok: false; error: string } | { ok: true; world: number; seed: number; mode: 'trial' | 'race'; lapMs: number; totalMs: number; lapTimes: number[] };
 
 /**
  * The client sends only its identity, name and an input replay. The server re-simulates the race and stores the
@@ -66,7 +74,7 @@ export async function submitScore(sql: Sql, input: unknown, verify: Verifier): P
 
   const v = verify(b.replay);
   if (!v.ok) return bad(v.error);
-  const { world, seed, lapMs, totalMs } = v;
+  const { world, seed, mode, lapMs, totalMs } = v;
   const min = MIN_LAP_MS[world];
   if (!min || lapMs < min || lapMs > MAX_LAP_MS) return bad('implausible lap time');
   if (totalMs < lapMs + 2 * min || totalMs > MAX_TOTAL_MS) return bad('implausible race time');
@@ -78,9 +86,9 @@ export async function submitScore(sql: Sql, input: unknown, verify: Verifier): P
   const recent = await sql`select 1 from scores where client_id = ${clientId} and updated_at > now() - make_interval(secs => ${THROTTLE_SECONDS}) limit 1`;
   if (recent.length) return bad('slow down', 429);
 
-  await sql`insert into scores (client_id, name, world, seed, lap_ms, total_ms)
-    values (${clientId}, ${name}, ${world}, ${seed}, ${lapMs}, ${totalMs})
-    on conflict (client_id, world, seed) do update
+  await sql`insert into scores (client_id, name, world, seed, mode, lap_ms, total_ms)
+    values (${clientId}, ${name}, ${world}, ${seed}, ${mode}, ${lapMs}, ${totalMs})
+    on conflict (client_id, world, seed, mode) do update
       set name = excluded.name,
           lap_ms = least(scores.lap_ms, excluded.lap_ms),
           total_ms = least(scores.total_ms, excluded.total_ms),
@@ -88,7 +96,8 @@ export async function submitScore(sql: Sql, input: unknown, verify: Verifier): P
   return { status: 200, body: { ok: true, lapMs, totalMs } };
 }
 
-export async function getBoard(sql: Sql, worldParam: string | null, seedParam: string | null): Promise<Result> {
+export async function getBoard(sql: Sql, worldParam: string | null, seedParam: string | null, modeParam: string | null = null): Promise<Result> {
+  const mode = modeParam === 'race' ? 'race' : 'trial';
   const world = Number(worldParam);
   if (!isInt(world) || !(world in MIN_LAP_MS)) return bad('unknown world');
   const seed = seedParam == null || seedParam === '' ? null : Number(seedParam);
@@ -96,7 +105,7 @@ export async function getBoard(sql: Sql, worldParam: string | null, seedParam: s
 
   await ensureSchema(sql);
   const rows = await sql`select name, lap_ms, total_ms, world, seed from scores
-    where world = ${world} and (${seed}::int is null or seed = ${seed})
+    where world = ${world} and mode = ${mode} and (${seed}::int is null or seed = ${seed})
     order by lap_ms asc limit 25`;
   return { status: 200, body: rows };
 }

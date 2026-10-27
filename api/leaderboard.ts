@@ -4,7 +4,7 @@ import { getSql, json } from './_db.js';
 export async function GET(request: Request): Promise<Response> {
   try {
     const q = new URL(request.url).searchParams;
-    const r = await getBoard(getSql(), q.get('world'), q.get('seed'));
+    const r = await getBoard(getSql(), q.get('world'), q.get('seed'), q.get('mode'));
     return json(r.body, r.status);
   } catch (e) {
     console.error('leaderboard', e);

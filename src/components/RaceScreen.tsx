@@ -9,6 +9,8 @@ import { generateTrack } from '../game/track';
 import { ITEM_INFO } from '../game/items';
 import type { Mode } from '../game/karts';
 import { loadSettings, nextHudMode, saveSettings, type HudMode } from '../utils/settings';
+import { dragToSteer, holdRange, padSteer, smoothSteer } from '../utils/steering';
+import KeyHints, { isDesktop } from './KeyHints';
 import { WORLDS } from '../game/worlds';
 import type { HudSnapshot, RaceResult } from '../game/types';
 import { formatTime } from '../utils/format';
@@ -49,6 +51,12 @@ export default function RaceScreen({ world, seed, mode, kart, onFinish, onQuit, 
     saveSettings({ hud: next });
   };
   const steerRange = useRef(loadSettings().steerRange); // px of thumb travel for full lock
+  const [scheme, setScheme] = useState(() => loadSettings().touchScheme);
+  const desktop = useMemo(isDesktop, []);
+  const steerTarget = useRef(0); // what the thumb (or pad) asks for
+  const steerCur = useRef(0); // the smoothed value the engine actually sees
+  const touchSteering = useRef(false);
+  const pads = useRef({ left: false, right: false });
   const drag = useRef<{ id: number; origin: number } | null>(null);
   const w = WORLDS[world - 1];
 
@@ -56,11 +64,29 @@ export default function RaceScreen({ world, seed, mode, kart, onFinish, onQuit, 
     const engine = new Engine({ canvas: canvasRef.current!, world, seed, onHud: setHud, onFinish: (r) => finishRef.current(r), mode, kart });
     engineRef.current = engine;
     engine.start();
+    // touch steering is eased towards the thumb's position every frame (the keyboard writes straight through)
+    let raf = 0;
+    let last = performance.now();
+    let shown = 0;
+    const tick = (t: number) => {
+      const dt = Math.min(0.05, (t - last) / 1000);
+      last = t;
+      if (touchSteering.current || steerCur.current !== 0) {
+        steerCur.current = smoothSteer(steerCur.current, steerTarget.current, dt);
+        engine.input.steer = steerCur.current;
+        if (Math.abs(steerCur.current - shown) > 0.04 || (steerCur.current === 0 && shown !== 0)) {
+          shown = steerCur.current;
+          setSteerUi(shown);
+        }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
     const keys = new Set<string>();
     const sync = () => {
       const l = keys.has('ArrowLeft') || keys.has('a') || keys.has('A');
       const r = keys.has('ArrowRight') || keys.has('d') || keys.has('D');
-      if (!drag.current) {
+      if (!drag.current && !touchSteering.current && steerCur.current === 0) {
         engine.input.steer = (r ? 1 : 0) - (l ? 1 : 0);
         setSteerUi(engine.input.steer);
       }
@@ -87,6 +113,7 @@ export default function RaceScreen({ world, seed, mode, kart, onFinish, onQuit, 
       window.removeEventListener('keydown', down);
       window.removeEventListener('keyup', up);
       document.removeEventListener('visibilitychange', vis);
+      cancelAnimationFrame(raf);
       engine.destroy();
       engineRef.current = null;
     };
@@ -96,28 +123,35 @@ export default function RaceScreen({ world, seed, mode, kart, onFinish, onQuit, 
     engineRef.current?.setPaused(paused);
     steerRange.current = loadSettings().steerRange; // may have been changed from the pause menu
     setHudMode(loadSettings().hud);
+    setScheme(loadSettings().touchScheme);
+    engineRef.current?.refreshSettings();
   }, [paused]);
 
   // ---- thumb steering: drag anywhere; the anchor follows the thumb so reversing is instant ----
   const setSteer = (v: number) => {
-    if (engineRef.current) engineRef.current.input.steer = v;
-    setSteerUi(v);
+    steerTarget.current = v;
+    touchSteering.current = drag.current !== null || pads.current.left || pads.current.right;
+  };
+  const setPad = (side: 'left' | 'right', held: boolean) => {
+    pads.current[side] = held;
+    setSteer(padSteer(pads.current.left, pads.current.right));
   };
   const onDown = (e: React.PointerEvent) => {
-    if (drag.current) return;
+    if (drag.current || scheme !== 'drag') return;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     drag.current = { id: e.pointerId, origin: e.clientX };
+    touchSteering.current = true;
   };
   const onMove = (e: React.PointerEvent) => {
     const d = drag.current;
     if (!d || d.id !== e.pointerId) return;
     let dx = e.clientX - d.origin;
     const range = steerRange.current;
-    if (dx > range) d.origin = e.clientX - range;
-    if (dx < -range) d.origin = e.clientX + range;
+    const lim = holdRange(range);
+    if (dx > lim) d.origin = e.clientX - lim;
+    if (dx < -lim) d.origin = e.clientX + lim;
     dx = e.clientX - d.origin;
-    const v = Math.abs(dx) < 4 ? 0 : dx / range;
-    setSteer(Math.max(-1, Math.min(1, v)));
+    setSteer(dragToSteer(dx, range));
   };
   const onUp = (e: React.PointerEvent) => {
     if (drag.current?.id === e.pointerId) {
@@ -217,14 +251,38 @@ export default function RaceScreen({ world, seed, mode, kart, onFinish, onQuit, 
         </div>
       )}
 
+      {desktop && !(tutorial && coachOpen) && <KeyHints countdown={cd != null} practice={mode === 'practice'} />}
+
       {/* bottom: speed, steer indicator, drift button */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-end justify-between px-4 pb-[calc(env(safe-area-inset-bottom)+18px)]">
-        <div className="glass !rounded-2xl px-3.5 py-2">
+        <div className={`glass !rounded-2xl px-3.5 py-2 ${scheme === 'buttons' ? 'absolute bottom-[calc(env(safe-area-inset-bottom)+126px)] left-4' : ''}`}>
           <p className="text-3xl font-extrabold leading-none tabular-nums">{hud?.kmh ?? 0}</p>
           <p className="text-[10px] font-semibold uppercase tracking-widest text-white/50">km/h</p>
         </div>
 
-        <div className="absolute bottom-[calc(env(safe-area-inset-bottom)+34px)] left-[120px] h-2 w-16 rounded-pill bg-white/10">
+        {scheme === 'buttons' && (
+          <div className="absolute bottom-[calc(env(safe-area-inset-bottom)+18px)] left-3 flex gap-2">
+            {(['left', 'right'] as const).map((side) => (
+              <button
+                key={side}
+                aria-label={side === 'left' ? 'Steer left' : 'Steer right'}
+                className={`pointer-events-auto flex h-[76px] w-[76px] touch-none select-none items-center justify-center rounded-3xl border text-4xl font-black backdrop-blur-glass transition ${pads.current[side] || (steerUi < -0.3 && side === 'left') || (steerUi > 0.3 && side === 'right') ? 'scale-95 border-apple-blue bg-apple-blue/50 shadow-neon-blue' : 'border-glass-border bg-glass'}`}
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+                  setPad(side, true);
+                }}
+                onPointerUp={() => setPad(side, false)}
+                onPointerCancel={() => setPad(side, false)}
+                onContextMenu={(e) => e.preventDefault()}
+              >
+                {side === 'left' ? '‹' : '›'}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className={`absolute bottom-[calc(env(safe-area-inset-bottom)+34px)] left-[120px] h-2 w-16 rounded-pill bg-white/10 ${scheme === 'buttons' ? 'hidden' : ''}`}>
           <div className="relative h-full">
             <span className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/80" style={{ left: `${50 + steerUi * 45}%` }} />
           </div>
@@ -244,7 +302,7 @@ export default function RaceScreen({ world, seed, mode, kart, onFinish, onQuit, 
 
         <button
           aria-label="Drift and boost"
-          className="pointer-events-auto relative z-30 h-[92px] w-[92px] touch-none select-none"
+          className="pointer-events-auto relative z-30 ml-auto h-[92px] w-[92px] touch-none select-none"
           onPointerDown={(e) => {
             e.stopPropagation();
             (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
@@ -263,6 +321,7 @@ export default function RaceScreen({ world, seed, mode, kart, onFinish, onQuit, 
           >
             <Zap size={22} fill={hud?.boosting ? 'currentColor' : 'none'} />
             Drift
+            {desktop && <span className="mt-0.5 rounded border border-white/30 px-1 text-[9px] font-semibold normal-case tracking-normal text-white/70">Space</span>}
           </span>
         </button>
       </div>
@@ -280,7 +339,9 @@ export default function RaceScreen({ world, seed, mode, kart, onFinish, onQuit, 
             <button onClick={onQuit} className="btn-glass w-full">
               Quit to menu
             </button>
-            <p className="pt-1 text-xs text-white/45">Drag to steer · hold DRIFT in a turn, release to boost · tap the item button (or E) to use pick-ups</p>
+            <p className="pt-1 text-xs text-white/45">
+              {desktop ? '← → steer · hold Space in a bend to drift, release for a boost · E uses pick-ups · P pauses' : `${scheme === 'buttons' ? 'Use the arrow pads to steer' : 'Drag to steer'} · hold DRIFT in a turn, release to boost · tap the item button to use pick-ups`}
+            </p>
           </div>
         </div>
       )}
