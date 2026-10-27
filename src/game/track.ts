@@ -137,9 +137,9 @@ function decorate(segs: Segment[], worldId: number, seed: number) {
   const N = segs.length;
   const add = (i: number, s: Scenery) => segs[((i % N) + N) % N].scenery.push(s);
   const lampKind = worldId === 3 ? 'torch' : 'lamp';
-  const every = worldId === 3 ? 7 : 9;
+  const every = worldId === 3 ? 7 : worldId === 4 ? 12 : 9;
   for (let i = 5; i < N; i += every) {
-    for (const side of [-1, 1]) add(i + (side > 0 ? 0 : 3), { kind: lampKind, offset: side * (worldId === 1 ? 1.36 : 1.3), size: 1, hue: art.next() });
+    for (const side of [-1, 1]) add(i + (side > 0 ? 0 : 3), { kind: lampKind, offset: side * (worldId === 1 ? 1.36 : worldId === 4 ? 1.52 : 1.3), size: 1, hue: art.next() });
   }
   if (worldId === 1) {
     for (let i = 0; i < N; i++) {
@@ -147,10 +147,16 @@ function decorate(segs: Segment[], worldId: number, seed: number) {
       if (art.chance(0.03)) add(i, { kind: 'palm', offset: art.sign() * art.range(2.2, 3), size: art.range(0.9, 1.4), hue: art.next() });
     }
   }
+  if (worldId === 4) {
+    for (let i = 0; i < N; i++) {
+      if (art.chance(0.06)) add(i, { kind: 'flag', offset: art.sign() * art.range(1.65, 1.95), size: art.range(0.9, 1.2), hue: art.next() });
+      if (art.chance(0.012)) add(i, { kind: 'truck', offset: art.sign() * art.range(2.0, 2.8), size: art.range(0.9, 1.15), hue: art.next() });
+    }
+  }
   // set pieces over the road: a START arch on the line, then something every few hundred segments
   add(4, { kind: 'arch', offset: 0, size: 1, hue: 0.2, label: 'START' });
-  const span = worldId === 1 ? (['arch', 'bunting'] as const) : worldId === 2 ? (['ring', 'ring'] as const) : (['gantry', 'gantry'] as const);
-  const labels = worldId === 1 ? ['TURBO DRIFT', 'NEON CITY', 'DRIFT KING', 'GO GO GO'] : worldId === 3 ? ['OBSIDIAN CORE', 'MAGMA RUN', 'KEEP COOL'] : [''];
+  const span = worldId === 1 ? (['arch', 'bunting'] as const) : worldId === 2 ? (['ring', 'ring'] as const) : worldId === 4 ? (['arch', 'arch'] as const) : (['gantry', 'gantry'] as const);
+  const labels = worldId === 1 ? ['TURBO DRIFT', 'NEON CITY', 'DRIFT KING', 'GO GO GO'] : worldId === 3 ? ['OBSIDIAN CORE', 'MAGMA RUN', 'KEEP COOL'] : worldId === 4 ? ['MESA 12 MI', 'FUEL · FOOD', 'NEXT EXIT', 'SUNBAKED MESA'] : [''];
   let n = 0;
   for (let i = art.int(160, 240); i < N - 80; i += art.int(220, 340)) {
     const kind = span[n % span.length];

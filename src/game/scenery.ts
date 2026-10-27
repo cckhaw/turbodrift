@@ -185,6 +185,24 @@ export function drawScenery(ctx: Ctx, s: Scenery, cx: number, base: number, u: n
         ctx.fill();
         break;
       }
+      if (wd.id === 4) {
+        // grey highway lamp with a long arm reaching over the lanes
+        const toward4 = -side;
+        ctx.fillStyle = '#8b929d';
+        ctx.fillRect(cx - pw / 2, base - h, pw, h);
+        const ex4 = cx + toward4 * 1100 * k * u;
+        const ey4 = base - h - 90 * k * u;
+        ctx.strokeStyle = '#8b929d';
+        ctx.lineWidth = Math.max(1.2, pw * 0.8);
+        ctx.beginPath();
+        ctx.moveTo(cx, base - h);
+        ctx.quadraticCurveTo(cx, ey4 - 260 * k * u, ex4, ey4);
+        ctx.stroke();
+        ctx.fillStyle = '#fff1c7';
+        rr(ctx, ex4 - 330 * k * u, ey4 - 40 * k * u, 660 * k * u, 150 * k * u, 70 * k * u);
+        ctx.fill();
+        break;
+      }
       // city street lamp with a curved arm over the road
       const toward = -side;
       ctx.fillStyle = '#39428f';
@@ -558,6 +576,189 @@ export function drawScenery(ctx: Ctx, s: Scenery, cx: number, base: number, u: n
       flame(ctx, cx, base - h, w * 1.5, h * 0.4, time, s.hue);
       break;
     }
+    case 'cactus': {
+      const h = 2800 * k * u;
+      const w = 430 * k * u;
+      const lit = (x: number, ww: number, y0: number, hh: number) => {
+        const g = ctx.createLinearGradient(x - ww / 2, 0, x + ww / 2, 0);
+        g.addColorStop(0, '#2f7a3c');
+        g.addColorStop(0.6, '#4aa152');
+        g.addColorStop(1, '#8fd27a');
+        ctx.fillStyle = g;
+        rr(ctx, x - ww / 2, y0, ww, hh, ww / 2);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(20,70,35,0.45)';
+        ctx.lineWidth = Math.max(1, ww * 0.06);
+        for (const f of [-0.18, 0.12]) {
+          ctx.beginPath();
+          ctx.moveTo(x + ww * f, y0 + ww * 0.4);
+          ctx.lineTo(x + ww * f, y0 + hh - ww * 0.3);
+          ctx.stroke();
+        }
+      };
+      ctx.fillStyle = 'rgba(120,60,30,0.28)';
+      ctx.beginPath();
+      ctx.ellipse(cx + w * 0.4, base, w * 1.4, w * 0.3, 0, 0, Math.PI * 2);
+      ctx.fill();
+      lit(cx, w, base - h, h);
+      for (const [sd, ay, ah] of [[-1, 0.55, 0.3], [1, 0.4, 0.28]] as const) {
+        const ax = cx + sd * w * 1.15;
+        lit(ax, w * 0.7, base - h * (ay + ah), h * ah + w * 0.3); // upright part of the arm
+        ctx.fillStyle = sd < 0 ? '#3a8b45' : '#4aa152';
+        rr(ctx, Math.min(cx, ax) - w * 0.1, base - h * ay - w * 0.1, Math.abs(ax - cx) + w * 0.2, w * 0.6, w * 0.3); // elbow joining the trunk
+        ctx.fill();
+      }
+      if (s.hue > 0.5) {
+        ctx.fillStyle = '#ff6fa8';
+        ctx.beginPath();
+        ctx.arc(cx, base - h, w * 0.3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      break;
+    }
+    case 'butte': {
+      const w = 2600 * k * u;
+      const h = (1500 + 1500 * s.hue) * k * u;
+      if (w < 4) break;
+      ctx.fillStyle = 'rgba(120,60,30,0.25)';
+      ctx.beginPath();
+      ctx.ellipse(cx + w * 0.25, base, w * 0.75, w * 0.07, 0, 0, Math.PI * 2);
+      ctx.fill();
+      const g = ctx.createLinearGradient(cx - w / 2, 0, cx + w / 2, 0);
+      g.addColorStop(0, '#a85a30');
+      g.addColorStop(0.6, '#d17c45');
+      g.addColorStop(1, '#f0a868');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.moveTo(cx - w / 2, base);
+      ctx.lineTo(cx - w * 0.4, base - h * 0.7);
+      ctx.lineTo(cx - w * 0.34, base - h);
+      ctx.lineTo(cx + w * 0.3, base - h);
+      ctx.lineTo(cx + w * 0.38, base - h * 0.66);
+      ctx.lineTo(cx + w / 2, base);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(110,45,25,0.4)';
+      for (let i = 1; i < 5; i++) ctx.fillRect(cx - w * 0.44, base - (h * i) / 5.2 - h * 0.02, w * 0.88, Math.max(1, h * 0.03));
+      ctx.fillStyle = 'rgba(255,230,190,0.5)';
+      ctx.fillRect(cx - w * 0.34, base - h, w * 0.64, Math.max(1.5, h * 0.03));
+      break;
+    }
+    case 'roadsign': {
+      const poleH = 2300 * k * u;
+      const d = 1000 * k * u;
+      const pw = Math.max(1.2, 80 * k * u);
+      ctx.fillStyle = '#6a707a';
+      ctx.fillRect(cx - pw / 2, base - poleH, pw, poleH);
+      const cy = base - poleH - d * 0.35;
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(Math.PI / 4);
+      ctx.fillStyle = '#f6c928';
+      rr(ctx, -d / 2.8, -d / 2.8, d / 1.4, d / 1.4, d * 0.07);
+      ctx.fill();
+      ctx.strokeStyle = '#1b1b1b';
+      ctx.lineWidth = Math.max(1, d * 0.035);
+      rr(ctx, -d / 3.3, -d / 3.3, d / 1.65, d / 1.65, d * 0.04);
+      ctx.stroke();
+      ctx.restore();
+      ctx.strokeStyle = '#1b1b1b';
+      ctx.fillStyle = '#1b1b1b';
+      ctx.lineWidth = Math.max(1, d * 0.07);
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      if (s.hue > 0.5) {
+        // crossing
+        ctx.moveTo(cx - d * 0.18, cy - d * 0.18);
+        ctx.lineTo(cx + d * 0.18, cy + d * 0.18);
+        ctx.moveTo(cx + d * 0.18, cy - d * 0.18);
+        ctx.lineTo(cx - d * 0.18, cy + d * 0.18);
+        ctx.stroke();
+      } else {
+        // curve ahead
+        ctx.moveTo(cx - d * 0.12, cy + d * 0.2);
+        ctx.quadraticCurveTo(cx - d * 0.12, cy - d * 0.02, cx + d * 0.12, cy - d * 0.14);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(cx + d * 0.2, cy - d * 0.2);
+        ctx.lineTo(cx + d * 0.02, cy - d * 0.2);
+        ctx.lineTo(cx + d * 0.2, cy - d * 0.02);
+        ctx.fill();
+      }
+      break;
+    }
+    case 'shrub': {
+      const r = 520 * k * u;
+      ctx.fillStyle = 'rgba(120,60,30,0.25)';
+      ctx.beginPath();
+      ctx.ellipse(cx, base, r * 1.8, r * 0.35, 0, 0, Math.PI * 2);
+      ctx.fill();
+      for (const [dx, dy, rad, col] of [
+        [-0.8, -0.4, 0.8, '#7a8f3c'],
+        [0.8, -0.45, 0.75, '#8aa24a'],
+        [0, -0.9, 0.95, '#9db557'],
+        [0.2, -0.3, 0.7, '#6f8236'],
+      ] as const) {
+        ctx.fillStyle = col;
+        ctx.beginPath();
+        ctx.arc(cx + dx * r, base + dy * r, rad * r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      break;
+    }
+    case 'flag': {
+      const h = 3900 * k * u;
+      const pw = Math.max(1.2, 70 * k * u);
+      ctx.fillStyle = '#d9dee5';
+      ctx.fillRect(cx - pw / 2, base - h, pw, h);
+      const wave = Math.sin(time * 3 + s.hue * 20);
+      const fw = 620 * k * u;
+      const fh = 1900 * k * u;
+      const dir = side;
+      const x0 = cx + dir * pw;
+      ctx.fillStyle = '#1fa65a';
+      ctx.beginPath();
+      ctx.moveTo(x0, base - h);
+      ctx.quadraticCurveTo(x0 + dir * (fw + wave * fw * 0.2), base - h + fh * 0.25, x0 + dir * fw * 0.7, base - h + fh);
+      ctx.quadraticCurveTo(x0 + dir * fw * 0.1, base - h + fh * 0.8, x0, base - h + fh * 0.9);
+      ctx.fill();
+      ctx.fillStyle = '#ffd60a';
+      ctx.beginPath();
+      ctx.arc(x0 + dir * fw * 0.35, base - h + fh * 0.4, fw * 0.17, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case 'truck': {
+      const w = 2300 * k * u;
+      const h = 2900 * k * u;
+      if (w < 6) break;
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
+      ctx.beginPath();
+      ctx.ellipse(cx, base, w * 0.62, w * 0.07, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // box trailer seen from behind: ribbed panels, split doors, lights, bumper and wheels
+      const g = ctx.createLinearGradient(cx - w / 2, 0, cx + w / 2, 0);
+      g.addColorStop(0, '#8f98a4');
+      g.addColorStop(0.5, '#b9c1cb');
+      g.addColorStop(1, '#7c8591');
+      ctx.fillStyle = g;
+      ctx.fillRect(cx - w / 2, base - h, w, h * 0.86);
+      ctx.fillStyle = 'rgba(60,70,85,0.35)';
+      for (let i = 1; i < 14; i++) ctx.fillRect(cx - w / 2 + (w * i) / 14, base - h, Math.max(1, w * 0.012), h * 0.86);
+      ctx.fillStyle = '#4b5460';
+      ctx.fillRect(cx - w * 0.012, base - h * 0.92, w * 0.024, h * 0.74);
+      ctx.fillStyle = '#d63a30';
+      ctx.fillRect(cx - w * 0.5, base - h * 0.95, w, h * 0.07);
+      ctx.fillStyle = '#ff3b30';
+      for (const sd of [-1, 1]) ctx.fillRect(cx + sd * w * 0.42 - w * 0.04, base - h * 0.32, w * 0.08, h * 0.05);
+      ctx.fillStyle = '#2a2f38';
+      ctx.fillRect(cx - w * 0.48, base - h * 0.14, w * 0.96, h * 0.05);
+      for (const sd of [-1, 1]) {
+        ctx.fillStyle = '#16181d';
+        rr(ctx, cx + sd * w * 0.38 - w * 0.1, base - h * 0.13, w * 0.2, h * 0.13, w * 0.04);
+        ctx.fill();
+      }
+      break;
+    }
     case 'arch':
     case 'bunting':
     case 'ring':
@@ -578,7 +779,8 @@ function drawSpan(ctx: Ctx, s: Scenery, cx: number, base: number, u: number, vu:
   const half = wd.roadWidth * u * 1.26;
   if (half < 6) return;
   const k = s.size;
-  const accent = wd.id === 1 ? (s.hue > 0.5 ? '#ff5fa2' : '#5ee0ff') : wd.id === 2 ? '#ff8ad8' : '#ff8a2a';
+  const day = wd.id === 4;
+  const accent = day ? '#ffffff' : wd.id === 1 ? (s.hue > 0.5 ? '#ff5fa2' : '#5ee0ff') : wd.id === 2 ? '#ff8ad8' : '#ff8a2a';
 
   if (s.kind === 'ring') {
     const cy = base - 2300 * vu;
@@ -643,7 +845,7 @@ function drawSpan(ctx: Ctx, s: Scenery, cx: number, base: number, u: number, vu:
 
   // arch / gantry: two posts, a beam and a lit sign
   const steel = s.kind === 'gantry' || wd.id === 3;
-  const postCol = steel ? '#4a4552' : wd.id === 2 ? '#6a3fb8' : '#2f3a8c';
+  const postCol = day ? '#8f96a1' : steel ? '#4a4552' : wd.id === 2 ? '#6a3fb8' : '#2f3a8c';
   const beamH = (steel ? 620 : 900) * k * vu;
   const top = base - postH;
   for (const sx of [-1, 1]) {
@@ -658,7 +860,7 @@ function drawSpan(ctx: Ctx, s: Scenery, cx: number, base: number, u: number, vu:
       ctx.fillStyle = accent;
       ctx.fillRect(x - pw / 2, top, Math.max(1, pw * 0.14), postH);
     }
-    glow(x, top + beamH * 0.5, pw * 4, accent, 0.5);
+    if (!day) glow(x, top + beamH * 0.5, pw * 4, accent, 0.5);
   }
   // beam
   const bg = vGrad(ctx, top - beamH, top + beamH * 0.2, [
@@ -673,28 +875,28 @@ function drawSpan(ctx: Ctx, s: Scenery, cx: number, base: number, u: number, vu:
   const pwid = half * 1.5;
   const ph = beamH * 2.3;
   const py = top - beamH - ph * 0.95;
-  const label = s.label ?? (steel ? 'OBSIDIAN CORE' : 'TURBO DRIFT');
-  const sg = vGrad(ctx, py, py + ph, steel ? [[0, '#2a1410'], [1, '#120806']] : wd.id === 2 ? [[0, '#6a35c8'], [1, '#2a1470']] : [[0, '#2a2fa0'], [1, '#12156a']]);
+  const label = s.label ?? (day ? 'MESA EXIT' : steel ? 'OBSIDIAN CORE' : 'TURBO DRIFT');
+  const sg = vGrad(ctx, py, py + ph, day ? [[0, '#22a05a'], [1, '#0e6a38']] : steel ? [[0, '#2a1410'], [1, '#120806']] : wd.id === 2 ? [[0, '#6a35c8'], [1, '#2a1470']] : [[0, '#2a2fa0'], [1, '#12156a']]);
   ctx.fillStyle = sg;
   rr(ctx, cx - pwid / 2, py, pwid, ph, ph * 0.18);
   ctx.fill();
   ctx.strokeStyle = accent;
   ctx.lineWidth = Math.max(1.4, ph * 0.05);
   ctx.stroke();
-  glow(cx, py + ph / 2, pwid * 0.7, accent, 0.35);
+  if (!day) glow(cx, py + ph / 2, pwid * 0.7, accent, 0.35);
   if (pwid > 60) {
     ctx.font = `900 ${Math.round(ph * 0.5)}px -apple-system, system-ui, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = '#ffffff';
     ctx.shadowColor = accent;
-    ctx.shadowBlur = gfxState.lite ? 0 : Math.min(24, ph * 0.3);
+    ctx.shadowBlur = gfxState.lite || day ? 0 : Math.min(24, ph * 0.3);
     ctx.fillText(label, cx, py + ph * 0.54, pwid * 0.9);
     ctx.shadowBlur = 0;
   }
   // chasing bulbs along the beam
   const n = 14;
-  for (let i = 0; i < n; i++) {
+  for (let i = 0; i < (day ? 0 : n); i++) {
     const lit = steel ? Math.floor(time * 3 + i) % 2 === 0 : Math.floor(time * 7 + i) % 3 === 0;
     ctx.fillStyle = lit ? (steel ? '#ffb347' : '#ffffff') : rgba(accent, 0.55);
     const bx = cx - half + (2 * half * (i + 0.5)) / n;

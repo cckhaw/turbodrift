@@ -39,7 +39,7 @@ function recorder() {
   return { ctx, problems };
 }
 
-const ALL: SceneryKind[] = ['tower', 'sign', 'pylon', 'cloud', 'island', 'rock', 'lavaPillar', 'crystal', 'shop', 'lamp', 'crowd', 'palm', 'arch', 'bunting', 'turbine', 'balloon', 'ring', 'torch', 'gantry'];
+const ALL: SceneryKind[] = ['tower', 'sign', 'pylon', 'cloud', 'island', 'rock', 'lavaPillar', 'crystal', 'shop', 'lamp', 'crowd', 'palm', 'arch', 'bunting', 'turbine', 'balloon', 'ring', 'torch', 'gantry', 'cactus', 'butte', 'roadsign', 'shrub', 'flag', 'truck'];
 
 describe('the recorder', () => {
   it('flags the mistakes a real canvas would choke on', () => {
@@ -114,6 +114,7 @@ describe('scene drawing', () => {
       drawProp(ctx, 'missile', 200, 500, u, 2, 100);
       drawHazard(ctx, { kind: 'wind', base: 0, amp: 0.4, speed: 1, phase: 0, width: 0.2 }, 200, 500, u, 2600, 4, 0);
       drawHazard(ctx, { kind: 'block', base: 0.2, amp: 0, speed: 0, phase: 0, width: 0.17 }, 200, 500, u, 1900, 4, 0);
+      drawHazard(ctx, { kind: 'block', base: 0.2, amp: 0, speed: 0, phase: 1, width: 0.17 }, 200, 500, u, 2400, 4, 0, true); // traffic barrels
     }
     expect(problems.slice(0, 5)).toEqual([]);
   });
@@ -121,11 +122,12 @@ describe('scene drawing', () => {
 
 describe('track dressing', () => {
   it('adds street furniture and set pieces without touching the gameplay layout', () => {
-    for (const w of [1, 2, 3]) {
+    for (const w of [1, 2, 3, 4]) {
       const t = generateTrack(w, 4242);
       const kinds = new Set(t.segments.flatMap((s) => s.scenery.map((x) => x.kind)));
       expect(kinds.has(w === 3 ? 'torch' : 'lamp')).toBe(true);
-      expect(kinds.has(w === 1 ? 'arch' : w === 2 ? 'ring' : 'gantry')).toBe(true);
+      expect(kinds.has(w === 1 || w === 4 ? 'arch' : w === 2 ? 'ring' : 'gantry')).toBe(true);
+      if (w === 4) expect(kinds.has('flag') && kinds.has('truck')).toBe(true);
       expect(t.segments[4].scenery.some((x) => x.kind === 'arch' && x.label === 'START')).toBe(true);
       // the same seed gives identical dressing
       const again = generateTrack(w, 4242);

@@ -1,6 +1,6 @@
 # Turbo Drift: Neon Circuit
 
-A mobile-first arcade kart racer that runs in the browser: pseudo-3D drift racing against five AI bots across three worlds, with items, three karts, a daily challenge and a global leaderboard whose times are **verified on the server by replaying your inputs**. Nothing to install and no art assets (everything is drawn on a canvas and synthesised with Web Audio).
+A mobile-first arcade kart racer that runs in the browser: pseudo-3D drift racing against five AI bots across four worlds (three night scenes and a bright daylight desert), with items, three karts, a daily challenge and a global leaderboard whose times are **verified on the server by replaying your inputs**. Nothing to install and no art assets (everything is drawn on a canvas and synthesised with Web Audio).
 
 **Stack:** React 18 · Vite 5 · TypeScript · Tailwind CSS 3 · HTML5 Canvas · Web Audio API · Vercel Functions · Neon Postgres · Vitest.
 
@@ -22,7 +22,7 @@ A mobile-first arcade kart racer that runs in the browser: pseudo-3D drift racin
 ```bash
 npm install
 npm run dev        # http://localhost:5173 (also reachable from your phone on the same network)
-npm test           # 156 tests
+npm test           # 165 tests
 npm run build      # typecheck + production build
 ```
 
@@ -48,8 +48,8 @@ The kart accelerates automatically. On a desktop the race screen shows the keybo
 **On the road.**
 - Yellow chevrons are **boost pads** (1.2 s boost).
 - **Item boxes** (`?`, race mode only) respawn after 5 s.
-- World 2 has moving **wind gates** and world 3 has static **blocks**; hitting one cuts your speed to 45 %.
-- World 1 slows you on the grass. On the sky track (world 2) and the lava bridges (world 3), leaving the road means a **fall**: you respawn on the racing line after about a second.
+- World 2 has moving **wind gates**, world 3 has static **blocks** and world 4 has stacks of **traffic barrels**; hitting one cuts your speed to 45 %.
+- Worlds 1 and 4 slow you on the grass or sand. On the sky track (world 2) and the lava bridges (world 3), leaving the road means a **fall**: you respawn on the racing line after about a second.
 - 3 laps. In a race you start 4th of 6 and bots rubber-band so the pack stays close.
 
 ## Features
@@ -58,7 +58,7 @@ The kart accelerates automatically. On a desktop the race screen shows the keybo
 - **Practice**: endless solo driving on the track you've selected, with item boxes and no countdown. Nothing is timed, recorded or unlocked, so it's the place to get used to the controls, the HUD and the items. **All three worlds are open in Practice** even if you haven't unlocked them for racing (switching back to Race or Time Trial drops you to your highest unlocked world).
 - **Race**: 3 laps against 5 bots (CyberBot-01, NeonViper, GlitchRider, ByteBlaze, ChromeFang, PulseNova pool), with item boxes. Finishing in the top 3 unlocks the next world.
 - **Time Trial**: solo, no bots or items, racing your own best-lap **ghost** for that kart (the ghost is Time Trial only; in a race it would look like a car restarting at the line every lap). Its times go on the global **Time Trial** leaderboard (races have their own board).
-- **Daily challenge**: one track per UTC day for everyone (the world rotates 1 → 2 → 3, the seed is derived from the date), played as a Time Trial. Because everyone gets the same seed, the leaderboard for that seed *is* the daily board. The menu card shows your best, the time until the reset, a ✅ once done and a 🔥 streak of consecutive days.
+- **Daily challenge**: one track per UTC day for everyone (the world rotates 1 → 2 → 3 → 4, the seed is derived from the date), played as a Time Trial. Because everyone gets the same seed, the leaderboard for that seed *is* the daily board. The menu card shows your best, the time until the reset, a ✅ once done and a 🔥 streak of consecutive days.
 
 
 ### Track map and road ahead
@@ -75,8 +75,9 @@ A guided lap on an easy fixed track (world 1, seed 4242), run in endless Practic
 | 1 | Neon Megacity | Beginner | wide | gentle (max 3) | 1500 segments, ~40 s | grass slows you; night city with shop fronts, crowds, palms and banner arches |
 | 2 | Cyber Stratosphere | Intermediate | medium | up to 5 | 1800 segments | sky track over a cloud sea, balloons, floating islands, light rings, moving wind gates, falls |
 | 3 | Obsidian Core | Expert | narrow | up to 6.5 incl. hairpins | 2000 segments | lava-lit bridges, volcanoes, brazier torches, steel gantries, barrier blocks, falls |
+| 4 | Sunbaked Mesa | Intermediate | wide | long sweepers (max 4) | 1700 segments | **daylight** desert highway: sand slows you, guard rails, traffic barrels, mesas |
 
-World 1 is open; world 2 unlocks with a podium finish (top 3) in world 1, and world 3 with a podium in world 2. A challenge link or the daily challenge opens its world regardless. Progress, medals and the daily streak are stored on the device and can be synced with [cloud save](#cloud-save).
+World 1 is open; each next world unlocks with a podium finish (top 3) in the one before it (so world 4 follows world 3), and Practice opens all of them. A challenge link or the daily challenge opens its world regardless. Progress, medals and the daily streak are stored on the device and can be synced with [cloud save](#cloud-save).
 
 ### Karts
 
@@ -111,7 +112,8 @@ Each world is dressed as a lively, saturated scene rather than a flat backdrop (
 - **Neon Megacity**: a dusk sky with a cratered moon, search lights and fireworks, three parallax skyline layers with lit windows and blinking rooftop beacons, a tiled pavement with a glowing kerb, street lamps arching over the road, shop fronts with striped awnings and neon signs, billboards, waving crowds behind barriers, glowing palms, bunting, and banner arches (a START arch with a checkered strip on the line).
 - **Cyber Stratosphere**: a sunrise over a sea of cloud, aurora ribbons, soft puffy cloud banks, floating islands with waterfalls of light, hot-air balloons, wind turbines, crystal lanterns and glowing rings over the road.
 - **Obsidian Core**: smoking volcanoes with lava falls, rising embers, a lava sea with glowing cracks, flame braziers lining the bridge, hazard-striped steel pylons and gantries, rocks veined with lava.
-- **Karts** have outlined glossy bodies, chunky tyres, chrome exhausts, reflective visors and are drawn slightly larger than their hit box so they read on a phone.
+- **Sunbaked Mesa** (the one world in full daylight): a bright blue sky with fat cumulus and a sun glare, three layers of flat-topped and mushroom mesas fading into the haze, a passing helicopter, orange sand, a grey highway with a double yellow centre line, white lane dashes, red and white kerbs, a gravel shoulder and steel guard rails, curved highway lamps, saguaro cacti, shrubs, yellow warning signs, feather flags, parked trailers, green overhead exit-sign gantries and orange traffic barrels.
+- **Karts** are round and chunky: bubble bodies, fat capsule tyres, ring exhausts with orange-and-blue flames, a driver with a round cap, ears and a badge, drawn slightly larger than their hit box so they read on a phone. Comet is the balanced bubble, Rocket is a taller egg with a wide wing and Phantom a low, wide pod with swept side fins.
 
 Decoration comes from its own seeded random stream, so it never changes a track's layout (pads, boxes, hazards, replays and ghosts are unaffected). The static layers (sky, skylines, clouds, moon, sun) are painted once into offscreen canvases; the rest is drawn per frame. **Battery saver** drops the extra decoration (glows, fireworks, search lights, aurora, embers, window lights), and the game does the same by itself for the rest of the session if frames average slower than about 38 fps for a few seconds.
 
@@ -207,7 +209,7 @@ All endpoints return JSON with `Cache-Control: no-store`; errors are `{ "error":
 
 | Method & path | Body / query | Success | Errors |
 |---|---|---|---|
-| `GET /api/leaderboard` | `?world=1..3`, optional `&seed=N` and `&mode=race\|trial` (default `trial`) | `[{ name, lap_ms, total_ms, world, seed }]` (top 25) | 400 bad world/seed, 503 |
+| `GET /api/leaderboard` | `?world=1..4`, optional `&seed=N` and `&mode=race\|trial` (default `trial`) | `[{ name, lap_ms, total_ms, world, seed }]` (top 25) | 400 bad world/seed, 503 |
 | `POST /api/score` | `{ clientId, name, replay }` | `{ ok: true, lapMs, totalMs }` (the **server's** times) | 400 invalid or unverifiable replay, 429 slow down, 503 |
 | `POST /api/save` | `{ unlocked, medals, days, name, kart }` | `{ code, save }` | 400 bad save, 429 slow down, 503 |
 | `GET /api/save` | `?code=XXXX-XXXX-XXXX` (case and dashes forgiven) | `{ save }` | 400 bad code, 404 unknown code, 503 |
@@ -222,7 +224,7 @@ npm test             # vitest run
 npm run typecheck
 ```
 
-156 tests in `tests/` (they also run in CI):
+165 tests in `tests/` (they also run in CI):
 
 | File | Covers |
 |---|---|
@@ -235,7 +237,7 @@ npm run typecheck
 | `minimap`, `lookahead`, `hud`, `settings` | closed non-pinching track maps for every world and seed, bend detection (direction, severity, distance, S-bends, wrap past the finish), map marks and dot spreading, the HUD's racer markers (one *you*, unique positions) and the panel setting |
 | `race-board` | race submissions: the server re-runs a whole race with bots and items and matches the client, separate race / time-trial boards, item-press validation, the database upgrade from the old schema, plausibility floors with item turbos |
 | `touch` | touch steering curve, dead zone and smoothing, arrow pads, the touch settings, and drift assist (starts drifts in bends, boosts, and is recorded so the server reproduces it) |
-| `layout` | golden fingerprints: the road, pads, hazards and item boxes of 12 world+seed tracks never change |
+| `layout` | golden fingerprints: the road, pads, hazards and item boxes of 16 world+seed tracks never change |
 | `render` | every sprite, backdrop, kart, hazard and prop draws without non-finite numbers or the negative radii that make a browser throw, at every distance, world and variation, in both full and trimmed (lite) modes; the decoration never alters the layout |
 | `ghost`, `daily`, `items`, `format-share`, `cleanup` | ghosts per kart and settings, daily rotation and streaks, item odds and kart stats, scorecard text, deployment selection |
 

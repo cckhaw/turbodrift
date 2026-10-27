@@ -18,7 +18,14 @@ export type SceneryKind =
   | 'balloon'
   | 'ring'
   | 'torch'
-  | 'gantry';
+  | 'gantry'
+  // daylight desert highway
+  | 'cactus'
+  | 'butte'
+  | 'roadsign'
+  | 'shrub'
+  | 'flag'
+  | 'truck';
 import type { Item } from './items.js';
 import type { Ahead } from './lookahead.js';
 

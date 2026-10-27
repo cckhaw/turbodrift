@@ -88,7 +88,7 @@ describe('race submissions', () => {
     expect(((await getBoard(osql, '1', '5', 'race')).body as unknown[]).length).toBe(1);
   });
 
-  it.each([2, 3])('race laps with item turbos stay above the plausibility floor in world %i', async (world) => {
+  it.each([2, 3, 4])('race laps with item turbos stay above the plausibility floor in world %i', async (world) => {
     const r = await recordRace(world, 21);
     expect(r.result.bestLap).toBeGreaterThan(MIN_LAP_MS[world]);
   }, 120000);

@@ -4,7 +4,7 @@ create table if not exists scores (
   id          bigint generated always as identity primary key,
   client_id   uuid        not null,
   name        text        not null check (char_length(name) between 1 and 12),
-  world       int         not null check (world between 1 and 3),
+  world       int         not null,
   seed        int         not null check (seed between 1 and 999999999),
   mode        text        not null default 'trial',
   lap_ms      int         not null check (lap_ms between 1000 and 600000),

@@ -1,7 +1,9 @@
 import { PGlite } from '@electric-sql/pglite';
 import { describe, expect, it } from 'vitest';
 import type { Sql } from '../api/_core';
-import { CODE_ALPHABET, createSave, getSave, makeCode, mergeSaves, normalizeCode, parseSave, putSave } from '../api/_save';
+import { CODE_ALPHABET, WORLD_COUNT, createSave, getSave, makeCode, mergeSaves, normalizeCode, parseSave, putSave } from '../api/_save';
+import { WORLDS } from '../src/game/worlds';
+import { MIN_LAP_MS } from '../api/_core';
 
 const db = new PGlite();
 const sql: Sql = async (s, ...v) => {
@@ -9,6 +11,11 @@ const sql: Sql = async (s, ...v) => {
   for (let i = 0; i < v.length; i++) text += `$${i + 1}` + s[i + 1];
   return (await db.query(text, v as unknown[])).rows as never[];
 };
+it('the server-side world count follows the real worlds', () => {
+  expect(WORLD_COUNT).toBe(WORLDS.length);
+  expect(Object.keys(MIN_LAP_MS).map(Number).sort()).toEqual(WORLDS.map((w) => w.id));
+});
+
 const base = { unlocked: 2, medals: { '1': 1, '2': 4 }, days: ['2026-10-25', '2026-10-26'], name: 'Kai', kart: 'rocket' };
 const CODE = 'ABCDEFGH2345';
 
@@ -19,7 +26,7 @@ describe('save parsing', () => {
 
   it.each([
     ['null', null],
-    ['unlocked out of range', { ...base, unlocked: 4 }],
+    ['unlocked out of range', { ...base, unlocked: 5 }],
     ['unlocked not an int', { ...base, unlocked: 1.5 }],
     ['unknown world medal', { ...base, medals: { '9': 1 } }],
     ['bad place', { ...base, medals: { '1': 0 } }],

@@ -36,11 +36,12 @@ interface Props {
   newPlayer: boolean;
 }
 
-const DIFF_COLOR = ['bg-apple-green/20 text-apple-green', 'bg-apple-yellow/20 text-apple-yellow', 'bg-apple-pink/20 text-apple-pink'];
+const DIFF_COLOR = ['bg-apple-green/20 text-apple-green', 'bg-apple-yellow/20 text-apple-yellow', 'bg-apple-pink/20 text-apple-pink', 'bg-white/25 text-white'];
 const CARD_BG = [
   'linear-gradient(170deg,#1c1f7a,#2b2a8f 40%,#a8327a)',
   'linear-gradient(170deg,#3a1a8c,#8a3fd1 45%,#ff9ad5)',
   'linear-gradient(170deg,#2a0603,#7a1d08 45%,#ff7a2a)',
+  'linear-gradient(170deg,#2b86d6,#76c6f4 50%,#e9a566)',
 ];
 
 export default function Menu(p: Props) {
@@ -135,7 +136,7 @@ export default function Menu(p: Props) {
                 className={`glass relative w-full overflow-hidden p-4 pb-[58px] text-left transition active:scale-[0.98] ${sel ? 'ring-2 ring-apple-blue shadow-neon-blue' : ''} ${locked ? 'opacity-55' : ''}`}
               >
                 <WorldArt world={wd.id} dim={locked} />
-                <div className="relative flex items-start justify-between gap-3">
+                <div className="relative flex items-start justify-between gap-3" style={wd.id === 4 && !locked ? { textShadow: '0 1px 8px rgba(0,45,100,0.65)' } : undefined}>
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="text-2xl">{wd.emoji}</span>
