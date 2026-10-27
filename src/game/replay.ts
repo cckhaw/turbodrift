@@ -1,6 +1,7 @@
 /** Compact input recording for server-side verification. 60 Hz fixed steps, run-length encoded. */
 export const FIXED_DT = 1 / 60;
 export const MAX_REPLAY_STEPS = 60 * 60 * 8; // 8 minutes of racing
+export const MAX_REPLAY_ITEMS = 400;
 
 export interface InputRun {
   steps: number; // how many consecutive steps this input is held
@@ -15,6 +16,8 @@ export class ReplayRecorder {
   runs: InputRun[] = [];
   total = 0;
   valid = true;
+  /** step numbers at which the player pressed the item button (races only) */
+  items: number[] = [];
 
   push(steer: number, drift: boolean): void {
     const last = this.runs[this.runs.length - 1];
@@ -30,6 +33,10 @@ export interface Replay {
   seed: number;
   kart: string;
   steps: number;
+  /** absent on older recordings, which are always time trials */
+  mode?: 'trial' | 'race';
+  /** step numbers at which the item button was pressed; races only */
+  items?: number[];
   data: string; // base64 of runs: varint(steps) int8(steer) u8(drift)
 }
 

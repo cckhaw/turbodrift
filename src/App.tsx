@@ -102,7 +102,7 @@ export default function App() {
       setDailyTick((n) => n + 1);
     }
     void syncCloud().then((p) => p && setProgress(p));
-    void saveScore({ name: getPlayerName(), lapMs: r.bestLap, totalMs: r.totalTime, world: r.world, seed: r.seed }, r.replay);
+    void saveScore({ name: getPlayerName(), lapMs: r.bestLap, totalMs: r.totalTime, world: r.world, seed: r.seed, mode: r.mode === 'race' ? 'race' : 'trial' }, r.replay);
     setResult(r);
     setScreen('results');
   }, []);
@@ -247,7 +247,7 @@ export default function App() {
           </div>
         </div>
       )}
-      {board && <LeaderboardModal world={world} seed={seed} last={result} onClose={() => setBoard(false)} />}
+      {board && <LeaderboardModal world={world} seed={seed} last={result} mode={mode} onClose={() => setBoard(false)} />}
     </div>
   );
 }

@@ -74,7 +74,7 @@ export default function Results({ result: r, newUnlock, onAgain, onMenu, onBoard
         )}
 
         {!trial && (
-          <p className="mt-3 text-center text-xs text-white/45">Global records come from Time Trial: the server replays your inputs to verify the time.</p>
+          <p className="mt-3 text-center text-xs text-white/45">Your best lap is posted to the Race leaderboard once the server has replayed your inputs to verify it.</p>
         )}
 
         {newUnlock && (

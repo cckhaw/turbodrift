@@ -9,6 +9,8 @@ export interface ScoreEntry {
   totalMs: number;
   world: number;
   seed: number;
+  /** which board it counts for; older local entries are time trials */
+  mode?: 'race' | 'trial';
   you?: boolean;
   at?: number;
 }
@@ -17,6 +19,8 @@ export interface Board {
   rows: ScoreEntry[];
   source: 'global' | 'offline' | 'local';
 }
+
+export type BoardMode = 'race' | 'trial';
 
 export { globalEnabled };
 
@@ -73,7 +77,7 @@ const clientId = (): string => {
   }
 };
 
-/** A verified-time-trial submission waiting to be sent. Kept until the server accepts or definitively rejects it. */
+/** A verified race or time-trial submission waiting to be sent. Kept until the server accepts or definitively rejects it. */
 interface Pending {
   id: string;
   name: string;
@@ -169,8 +173,8 @@ export function bestLocalLap(world: number, seed: number): number | null {
 }
 
 /**
- * Local records are kept for every run. Only time trials that carry an input replay go to the global board, where
- * the server re-simulates them (see api/score.ts).
+ * Local records are kept for every run. Races and time trials that carry an input replay go to the global board (each
+ * has its own), where the server re-simulates them (see api/score.ts).
  */
 export async function saveScore(e: Omit<ScoreEntry, 'you' | 'at'>, replay?: Replay): Promise<void> {
   const all = loadLocal();
@@ -185,18 +189,18 @@ export async function saveScore(e: Omit<ScoreEntry, 'you' | 'at'>, replay?: Repl
   await flushPending();
 }
 
-async function fetchGlobal(world: number, seed: number | null): Promise<ScoreEntry[]> {
-  const rows = (await (await api(`/api/leaderboard?world=${world}${seed != null ? `&seed=${seed}` : ''}`)).json()) as { name: string; lap_ms: number; total_ms: number; world: number; seed: number }[];
+async function fetchGlobal(world: number, seed: number | null, mode: BoardMode): Promise<ScoreEntry[]> {
+  const rows = (await (await api(`/api/leaderboard?world=${world}&mode=${mode}${seed != null ? `&seed=${seed}` : ''}`)).json()) as { name: string; lap_ms: number; total_ms: number; world: number; seed: number }[];
   return rows.map((r) => ({ name: r.name, lapMs: r.lap_ms, totalMs: r.total_ms, world: r.world, seed: r.seed }));
 }
 
 /** seed === null → best across every seed in the world. */
-export async function getBoard(world: number, seed: number | null): Promise<Board> {
-  const mine = loadLocal().filter((s) => s.world === world && (seed == null || s.seed === seed));
+export async function getBoard(world: number, seed: number | null, mode: BoardMode = 'trial'): Promise<Board> {
+  const mine = loadLocal().filter((s) => s.world === world && (s.mode ?? 'trial') === mode && (seed == null || s.seed === seed));
   if (globalEnabled()) {
     try {
       void flushPending();
-      const rows = await fetchGlobal(world, seed);
+      const rows = await fetchGlobal(world, seed, mode);
       // mark my own rows (the public view carries no client id): same name + same lap time as a local score
       for (const r of rows) r.you = mine.some((m) => m.name === r.name && Math.round(m.lapMs) === r.lapMs);
       return { rows, source: 'global' };

@@ -137,6 +137,18 @@ export default function SettingsModal({ muted, onMute, onProgress, onClose, onTu
           </Section>
 
           <Section title="Controls">
+            <Row label="Touch steering" hint="Drag anywhere, or two arrow pads (works like a keyboard)">
+              <div role="radiogroup" aria-label="Touch steering" className="flex rounded-pill bg-black/30 p-0.5 text-xs font-semibold">
+                {(['drag', 'buttons'] as const).map((m) => (
+                  <button key={m} role="radio" aria-checked={s.touchScheme === m} onClick={() => update({ touchScheme: m })} className={`rounded-pill px-2.5 py-1 transition ${s.touchScheme === m ? 'bg-apple-blue text-white' : 'text-white/60'}`}>
+                    {m === 'drag' ? 'Drag' : 'Arrows'}
+                  </button>
+                ))}
+              </div>
+            </Row>
+            <Row label="Drift assist" hint="Steering hard through a bend drifts for you; steer back to boost">
+              <Toggle on={s.driftAssist} label="Drift assist" onChange={(v) => update({ driftAssist: v })} />
+            </Row>
             <Row label="Steering sensitivity" hint="How far to drag for full lock">
               <Slider label="Steering sensitivity" value={160 - s.steerRange} min={40} max={120} step={5} onChange={(v) => update({ steerRange: 160 - v })} />
             </Row>

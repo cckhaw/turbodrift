@@ -6,12 +6,13 @@ create table if not exists scores (
   name        text        not null check (char_length(name) between 1 and 12),
   world       int         not null check (world between 1 and 3),
   seed        int         not null check (seed between 1 and 999999999),
+  mode        text        not null default 'trial',
   lap_ms      int         not null check (lap_ms between 1000 and 600000),
   total_ms    int         not null check (total_ms between 1000 and 3600000),
   created_at  timestamptz not null default now(),
-  updated_at  timestamptz not null default now(),
-  unique (client_id, world, seed)
+  updated_at  timestamptz not null default now()
 );
+create unique index if not exists scores_client_track_mode_idx on scores (client_id, world, seed, mode);
 create index if not exists scores_board_idx on scores (world, seed, lap_ms);
 create index if not exists scores_world_idx on scores (world, lap_ms);
 

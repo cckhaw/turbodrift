@@ -3,18 +3,21 @@ import { Check, Share2, X } from 'lucide-react';
 import { WORLDS } from '../game/worlds';
 import type { RaceResult } from '../game/types';
 import { formatTime } from '../utils/format';
-import { getBoard, getPlayerName, setPlayerName, type Board } from '../utils/leaderboard';
+import { getBoard, getPlayerName, setPlayerName, type Board, type BoardMode } from '../utils/leaderboard';
 import { challengeUrl, copyText, scorecardText } from '../utils/share';
 
 interface Props {
   world: number;
   seed: number;
   last: RaceResult | null;
+  /** the mode currently selected in the menu: decides which board opens first */
+  mode?: string;
   onClose: () => void;
 }
 
-export default function LeaderboardModal({ world, seed, last, onClose }: Props) {
+export default function LeaderboardModal({ world, seed, last, mode, onClose }: Props) {
   const [tab, setTab] = useState<'seed' | 'world'>('seed');
+  const [kind, setKind] = useState<BoardMode>((last?.mode ?? mode) === 'race' ? 'race' : 'trial');
   const [board, setBoard] = useState<Board | null>(null);
   const [name, setName] = useState(getPlayerName());
   const [copied, setCopied] = useState(false);
@@ -23,11 +26,11 @@ export default function LeaderboardModal({ world, seed, last, onClose }: Props) 
   useEffect(() => {
     let live = true;
     setBoard(null);
-    getBoard(world, tab === 'seed' ? seed : null).then((b) => live && setBoard(b));
+    getBoard(world, tab === 'seed' ? seed : null, kind).then((b) => live && setBoard(b));
     return () => {
       live = false;
     };
-  }, [world, seed, tab]);
+  }, [world, seed, tab, kind]);
 
   const share = async () => {
     const text = last && last.world === world && last.seed === seed ? scorecardText(last) : `🏁 Turbo Drift: Neon Circuit\n${w.emoji} ${w.name} · Seed ${seed}\nBeat my lap 👉 ${challengeUrl(world, seed)}`;
@@ -63,6 +66,14 @@ export default function LeaderboardModal({ world, seed, last, onClose }: Props) 
           </button>
         </div>
 
+        <div className="mx-5 mb-2 flex rounded-pill bg-black/30 p-1 text-sm font-medium" role="tablist" aria-label="Board type">
+          {(['race', 'trial'] as const).map((k) => (
+            <button key={k} role="tab" aria-selected={kind === k} onClick={() => setKind(k)} className={`flex-1 rounded-pill py-1.5 transition ${kind === k ? 'bg-white/15 text-white' : 'text-white/60'}`}>
+              {k === 'race' ? '🏁 Race' : '⏱️ Time Trial'}
+            </button>
+          ))}
+        </div>
+
         <div className="mx-5 flex rounded-pill bg-black/30 p-1 text-sm font-medium">
           {(['seed', 'world'] as const).map((t) => (
             <button key={t} onClick={() => setTab(t)} className={`flex-1 rounded-pill py-1.5 transition ${tab === t ? 'bg-apple-blue text-white' : 'text-white/60'}`}>
@@ -81,10 +92,10 @@ export default function LeaderboardModal({ world, seed, last, onClose }: Props) 
             </li>
           ))}
           {!board && <li className="py-8 text-center text-white/50">Loading…</li>}
-          {board && rows.length === 0 && <li className="py-8 text-center text-white/50">No times yet — be the first!</li>}
+          {board && rows.length === 0 && <li className="py-8 text-center text-white/50">{kind === 'race' ? 'No race times yet. Finish a race to post the first one!' : 'No time trials yet. Be the first!'}</li>}
         </ol>
         <p className="px-5 pt-2 text-[11px] text-white/40">
-          {board?.source === 'global' && 'Global board · server-verified time trials, best lap per player'}
+          {board?.source === 'global' && `Global board · server-verified ${kind === 'race' ? 'races' : 'time trials'}, best lap per player`}
           {board?.source === 'offline' && 'Can’t reach the global board — showing your times with rival ghosts'}
           {board?.source === 'local' && 'Local board with rival ghosts'}
           {best >= 0 ? ` · you’re #${best + 1}` : ''}

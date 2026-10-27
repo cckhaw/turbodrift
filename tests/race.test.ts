@@ -144,6 +144,7 @@ describe('items', () => {
     const { p, bot } = setup();
     p.player.item = 'missile';
     (p as unknown as { useItem(): void }).useItem();
+    p.update(1 / 60); // a press takes effect at the start of the next fixed step
     expect(p.missiles).toHaveLength(1);
     let hit = false;
     for (let i = 0; i < 60 && !hit; i++) {
@@ -168,6 +169,7 @@ describe('items', () => {
     const { p, bot } = setup();
     p.player.item = 'oil';
     (p as unknown as { useItem(): void }).useItem();
+    p.update(1 / 60); // a press takes effect at the start of the next fixed step
     expect(p.oils).toHaveLength(1);
     expect(p.player.spinT).toBe(0);
     for (let i = 0; i < 10; i++) p.update(1 / 30);

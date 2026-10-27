@@ -1,5 +1,5 @@
 import { synth } from '../audio/synth.js';
-import { FIXED_DT, ReplayRecorder, encodeRuns, quantizeSteer, type InputRun, type Replay } from './replay.js';
+import { FIXED_DT, MAX_REPLAY_ITEMS, ReplayRecorder, encodeRuns, quantizeSteer, type InputRun, type Replay } from './replay.js';
 import { Rng, hashSeed } from '../utils/rng.js';
 import { haptic } from '../utils/haptics.js';
 import { loadSettings, type Settings } from '../utils/settings.js';
@@ -110,6 +110,13 @@ export class Engine {
   private recorder = new ReplayRecorder();
   private replayRuns: InputRun[] | null = null;
   private replayIdx = 0;
+  private replayStep = 0;
+  private replayItems: number[] = [];
+  private replayItemIdx = 0;
+  private itemPress = false;
+  private assistT = 0;
+  private assistOn = false;
+  private assistDir = 0;
   private replayLeft = 0;
   private finalResult: RaceResult | null = null;
 
@@ -254,13 +261,25 @@ export class Engine {
         this.replayIdx++;
         this.replayLeft = this.replayRuns[this.replayIdx].steps;
       }
+      while (this.replayItemIdx < this.replayItems.length && this.replayItems[this.replayItemIdx] <= this.replayStep) {
+        if (this.replayItems[this.replayItemIdx++] === this.replayStep) this.tryUseItem();
+      }
+      this.replayStep++;
       return;
     }
     const q = quantizeSteer(this.input.steer);
     this.cmd.steer = q / 127;
-    this.cmd.drift = this.input.drift;
+    // the effective drift (held button or assist) is what gets recorded, so a replay needs no knowledge of the assist
+    this.cmd.drift = this.input.drift || this.driftAssist(dt);
     if (Math.abs(dt - FIXED_DT) > 1e-9) this.recorder.valid = false;
-    this.recorder.push(q, this.input.drift);
+    if (this.itemPress) {
+      // the press is applied inside the fixed step, so a replay can apply it at exactly the same step
+      this.itemPress = false;
+      if (this.recorder.items.length < MAX_REPLAY_ITEMS) this.recorder.items.push(this.recorder.total);
+      else this.recorder.valid = false;
+      this.tryUseItem();
+    }
+    this.recorder.push(q, this.cmd.drift);
   }
 
   private update(dt: number) {
@@ -519,23 +538,71 @@ export class Engine {
     }
   }
 
-  /** Time-trial recording for server verification; null if it can't be replayed exactly. */
+  /**
+   * Drift assist for touch play: steering hard through a real bend for a moment starts a drift, and steering back
+   * (or leaving the bend) lets go, which pays out the boost. Off unless the player enabled it.
+   */
+  private driftAssist(dt: number): boolean {
+    if (!this.settings.driftAssist || this.state !== 'racing') {
+      this.assistT = 0;
+      return (this.assistOn = false);
+    }
+    const steer = this.cmd.steer;
+    const p = this.player;
+    const curve = this.seg(p.dist).curve;
+    if (this.assistOn) {
+      // keep drifting while still steering the same way and the player is still going fast enough
+      if (steer * this.assistDir < 0.35 || p.speed < this.wd.maxSpeed * this.kart.speed * 0.3 || this.fallT > 0 || p.spinT > 0) this.assistOn = false;
+      return this.assistOn;
+    }
+    const inBend = Math.abs(curve) >= 0.8 && Math.sign(curve) === Math.sign(steer);
+    if (Math.abs(steer) >= 0.9 && inBend && p.speed > this.wd.maxSpeed * this.kart.speed * 0.55 && this.fallT <= 0 && p.spinT <= 0) {
+      this.assistT += dt;
+      if (this.assistT >= 0.18) {
+        this.assistOn = true;
+        this.assistDir = Math.sign(steer);
+        this.assistT = 0;
+      }
+    } else this.assistT = 0;
+    return this.assistOn;
+  }
+
+  /** Race or time-trial recording for server verification; null if it can't be replayed exactly. */
   getReplay(): Replay | null {
-    if (this.mode !== 'trial' || !this.recorder.valid || !this.finalResult || this.replayRuns) return null;
-    return { v: 1, world: this.o.world, seed: this.o.seed, kart: this.kart.id, steps: this.recorder.total, data: encodeRuns(this.recorder.runs) };
+    if (this.mode === 'practice' || !this.recorder.valid || !this.finalResult || this.replayRuns) return null;
+    const r: Replay = { v: 1, world: this.o.world, seed: this.o.seed, kart: this.kart.id, steps: this.recorder.total, data: encodeRuns(this.recorder.runs) };
+    if (this.mode === 'race') {
+      r.mode = 'race';
+      r.items = this.recorder.items;
+    }
+    return r;
   }
 
   /** Server side: drive the engine from recorded inputs (held at the last input once they run out). */
-  runReplay(runs: InputRun[], maxSteps: number): RaceResult | null {
+  runReplay(runs: InputRun[], maxSteps: number, items: number[] = []): RaceResult | null {
     this.replayRuns = runs;
+    this.replayItems = items;
+    this.replayItemIdx = 0;
+    this.replayStep = 0;
     this.replayIdx = 0;
     this.replayLeft = runs[0].steps;
     for (let i = 0; i < maxSteps && !this.finalResult; i++) this.update(FIXED_DT);
     return this.finalResult;
   }
 
-  /** Player taps the item button. */
+  /** Pick up settings changed from the pause menu (drift assist, shake, volumes). */
+  refreshSettings(): void {
+    this.settings = loadSettings();
+    synth.setVolumes(this.settings.music, this.settings.sfx);
+  }
+
+  /** Player taps the item button; it takes effect at the start of the next simulation step. */
   useItem(): void {
+    if (this.state === 'racing' && this.mode === 'race' && !this.replayRuns) this.itemPress = true;
+    else if (this.mode !== 'race') this.tryUseItem();
+  }
+
+  private tryUseItem(): void {
     const p = this.player;
     if (this.state !== 'racing' || !p.item || this.itemRollT > 0 || this.fallT > 0 || p.spinT > 0) return;
     this.activate(p);
