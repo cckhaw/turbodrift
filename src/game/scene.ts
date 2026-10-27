@@ -1,5 +1,6 @@
 import type { WorldConfig } from './types.js';
-import { glowDot, gfxState, mix, rgba, vGrad, type Ctx } from './gfx.js';
+import { flushGlows, glowDot, gfxState, mix, mixHex, rgba, vGrad, type Ctx } from './gfx.js';
+import type { Weather } from './weather.js';
 
 /** Deterministic 0..1 noise from a number, for window patterns and the like (no state, so frames never flicker). */
 export const hash = (n: number): number => {
@@ -381,7 +382,8 @@ function helicopter(ctx: Ctx, W: number, hz: number, H: number, t: number) {
 }
 
 // ---------- parallax background ----------
-export function drawBackdrop(ctx: Ctx, W: number, H: number, hz: number, wd: WorldConfig, bd: Backdrop, scroll: number, t: number) {
+export function drawBackdrop(ctx: Ctx, W: number, H: number, hz: number, wd: WorldConfig, bd: Backdrop, scroll: number, t: number, wx?: Weather) {
+  if (wd.weather && wx) return drawStormBackdrop(ctx, W, H, hz, bd, scroll, t, wx);
   const sig = `${W}x${H}x${hz}`;
   // the sky gradient and the big static glow on the horizon are painted once and blitted
   const paintSky = (c: Ctx) => {
@@ -535,6 +537,245 @@ export function drawBackdrop(ctx: Ctx, W: number, H: number, hz: number, wd: Wor
   ]);
   ctx.fillStyle = haze;
   ctx.fillRect(0, hz - H * 0.05, W, H * 0.05 + 2);
+}
+
+// ---------- the storm world: a sky that changes ----------
+const NIGHT_SKY: [string, string, string] = ['#04070f', '#0c1b36', '#22436b'];
+const DAY_SKY: [string, string, string] = ['#2f7fd0', '#76b4ec', '#cfe5f8'];
+const DUSK_SKY: [string, string, string] = ['#1c1850', '#8a3a68', '#ff9a55'];
+const STORM_SKY: [string, string, string] = ['#2a3140', '#4b566a', '#7d8ba0'];
+
+/** Sky colours (top, middle, horizon) and the fog that matches, for the current time of day and rain. */
+export function stormSky(wx: Weather): { sky: [string, string, string]; fog: string } {
+  const dusk = Math.max(0, 1 - Math.abs(wx.sun - 0.04) / 0.3) * 0.85;
+  const grey = wx.rain * 0.7 * (0.45 + 0.55 * wx.day);
+  const sky = [0, 1, 2].map((i) => {
+    let c = mixHex(NIGHT_SKY[i], DAY_SKY[i], wx.day);
+    c = mixHex(c, DUSK_SKY[i], dusk);
+    // the storm darkens day skies most, and leaves night skies mostly alone
+    return mixHex(c, mixHex(STORM_SKY[i], NIGHT_SKY[i], 1 - wx.day), grey);
+  }) as [string, string, string];
+  return { sky, fog: mixHex(sky[2], '#8da2bb', 0.25) };
+}
+
+function peaks(ctx: Ctx, W: number, H: number, hz: number, scroll: number, par: number, color: string, snow: string, n: number, hMul: number, seed: number) {
+  const tile = W * 2.2;
+  const base = wrapBase(scroll, par, tile);
+  for (const ox of [base, base + tile]) {
+    for (let i = 0; i < n; i++) {
+      const cx = ox + ((i + 0.5 + (hash(seed + i) - 0.5) * 0.6) / n) * tile;
+      if (cx < -W * 0.5 || cx > W * 1.5) continue;
+      const w = (tile / n) * (0.9 + hash(seed + i * 3) * 0.7);
+      const h = H * hMul * (0.45 + hash(seed + i * 7) * 0.75);
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(cx - w * 0.6, hz + 2);
+      ctx.lineTo(cx - w * 0.18, hz - h * 0.62);
+      ctx.lineTo(cx - w * 0.06, hz - h * 0.5);
+      ctx.lineTo(cx, hz - h);
+      ctx.lineTo(cx + w * 0.12, hz - h * 0.58);
+      ctx.lineTo(cx + w * 0.26, hz - h * 0.66);
+      ctx.lineTo(cx + w * 0.62, hz + 2);
+      ctx.fill();
+      ctx.fillStyle = snow;
+      ctx.beginPath();
+      ctx.moveTo(cx - w * 0.13, hz - h * 0.74);
+      ctx.lineTo(cx, hz - h);
+      ctx.lineTo(cx + w * 0.1, hz - h * 0.76);
+      ctx.lineTo(cx + w * 0.03, hz - h * 0.7);
+      ctx.lineTo(cx - w * 0.04, hz - h * 0.78);
+      ctx.fill();
+    }
+  }
+}
+
+export function drawStormBackdrop(ctx: Ctx, W: number, H: number, hz: number, bd: Backdrop, scroll: number, t: number, wx: Weather) {
+  const { sky, fog } = stormSky(wx);
+  ctx.fillStyle = vGrad(ctx, 0, hz + 4, [
+    [0, sky[0]],
+    [0.55, sky[1]],
+    [1, sky[2]],
+  ]);
+  ctx.fillRect(0, 0, W, hz + 4);
+
+  const starA = (1 - wx.day) * (1 - wx.rain * 0.85);
+  if (starA > 0.02) {
+    ctx.fillStyle = '#fff';
+    for (const s of bd.stars) {
+      ctx.globalAlpha = starA * (0.25 + 0.5 * Math.abs(Math.sin(t * 1.5 + s.x * 40)));
+      ctx.fillRect(s.x * W, s.y * hz * 0.8, s.r, s.r);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // the sun climbs from the left and sets on the right; the moon takes the opposite arc
+  const a = wx.phase * Math.PI * 2;
+  const sunX = W * (0.5 - 0.46 * Math.cos(a));
+  const sunY = hz * (0.95 - 0.8 * Math.max(-0.1, wx.sun));
+  const hide = 1 - wx.rain * 0.75;
+  if (wx.sun > -0.2) {
+    glowDot(ctx, sunX, sunY, H * 0.32, mixHex('#fff3c4', '#ff8a4a', Math.max(0, 1 - wx.sun * 2.4)), 0.75 * hide);
+    ctx.fillStyle = '#fffbe8';
+    ctx.globalAlpha = hide;
+    ctx.beginPath();
+    ctx.arc(sunX, sunY, H * 0.034, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  if (wx.sun < 0.2) {
+    const mx = W * (0.5 + 0.46 * Math.cos(a));
+    const my = hz * (0.95 - 0.8 * Math.max(-0.1, -wx.sun));
+    glowDot(ctx, mx, my, H * 0.2, '#cfe0ff', 0.5 * hide);
+    ctx.fillStyle = '#eef4ff';
+    ctx.globalAlpha = hide;
+    ctx.beginPath();
+    ctx.arc(mx, my, H * 0.026, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  // ridges: colour follows the light, with snow on top; the farthest dissolve into the fog
+  const dayCol = (far: number) => mixHex(mixHex('#5d7396', '#25324a', far), mixHex('#0d1626', '#070d18', far), 1 - wx.day);
+  const rainCol = (c: string) => mixHex(c, '#3a4556', wx.rain * 0.45);
+  const snow = mixHex('#f4f8ff', '#8a9bb8', 1 - wx.day);
+  peaks(ctx, W, H, hz, scroll, 0.08, mixHex(rainCol(dayCol(0)), fog, 0.45), mixHex(snow, fog, 0.3), 9, 0.34, 3);
+  peaks(ctx, W, H, hz, scroll, 0.17, mixHex(rainCol(dayCol(0.5)), fog, 0.2), snow, 7, 0.26, 17);
+  peaks(ctx, W, H, hz, scroll, 0.32, rainCol(dayCol(1)), mixHex(snow, '#000000', 0.2), 6, 0.17, 41);
+
+  // storm cloud deck: thick and dark in rain, thin wisps otherwise
+  const ctile = W * 2;
+  const deckA = 0.2 + 0.78 * wx.rain;
+  ctx.globalAlpha = deckA;
+  tiled(ctx, bd, 'stormClouds', W, H, hz, ctile, wrapBase(scroll + t * 40, 0.1, ctile), (c, ox) => paintCloudsTint(c, ctile, ox, bd.puffs, hz, hz * 0.03, hz * 0.34, H * 0.055, '#8f9cb0', '#4d586b', 0.95));
+  ctx.globalAlpha = 1;
+
+  const haze = vGrad(ctx, hz - H * 0.06, hz + 2, [
+    [0, rgba(fog, 0)],
+    [1, rgba(fog, 0.85)],
+  ]);
+  ctx.fillStyle = haze;
+  ctx.fillRect(0, hz - H * 0.06, W, H * 0.06 + 2);
+}
+
+/** Cloud tiles in two chosen colours (the day clouds are fixed white). */
+function paintCloudsTint(ctx: Ctx, tile: number, ox: number, puffs: Puff[], hz: number, y0: number, spread: number, size: number, light: string, shadow: string, alpha: number) {
+  for (const p of puffs) {
+    const r = size * (0.6 + p.s * 0.6);
+    const y = y0 + p.y * spread;
+    for (const x of [ox + p.x * tile, ox + p.x * tile - tile]) {
+      for (const [dx, dy, k] of [[0, 0, 1], [0.95, 0.15, 0.75], [-0.9, 0.18, 0.7], [0.3, -0.4, 0.6]] as const) {
+        const rr2 = r * k;
+        const cx = x + dx * r;
+        const cy = y + dy * r;
+        const g = ctx.createRadialGradient(cx - rr2 * 0.2, cy - rr2 * 0.4, rr2 * 0.1, cx, cy, rr2);
+        g.addColorStop(0, light);
+        g.addColorStop(1, shadow);
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(cx, cy, rr2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+  ctx.globalAlpha = 1;
+  void hz;
+}
+
+/** A dark sea far below the pass, lit by the day and flecked with whitecaps. */
+export function drawStormGround(ctx: Ctx, W: number, H: number, hz: number, wx: Weather, t: number): CanvasGradient {
+  const { fog } = stormSky(wx);
+  const top = mixHex(mixHex('#0b1a2c', '#4d7aa0', wx.day), fog, 0.35);
+  const mid = mixHex('#07121f', '#2a5578', wx.day);
+  const fill = vGrad(ctx, hz, H, [
+    [0, top],
+    [0.3, mid],
+    [1, mixHex('#03080f', '#12304a', wx.day)],
+  ]);
+  ctx.fillStyle = fill;
+  ctx.fillRect(-20, hz, W + 40, H - hz + 20);
+  ctx.strokeStyle = `rgba(220,235,255,${0.1 + 0.1 * wx.day + 0.1 * wx.rain})`;
+  for (let k = 0; k < 9; k++) {
+    const f = (k + ((t * 0.05) % 1)) / 9;
+    const y = hz + (H - hz) * f * f;
+    ctx.lineWidth = 1 + f * 3;
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    for (let i = 1; i <= 12; i++) ctx.lineTo((i / 12) * W, y + Math.sin(i * 1.9 + k * 2.3 + t * 0.9) * (1 + f * 6));
+    ctx.stroke();
+  }
+  return fill;
+}
+
+/**
+ * Night tint, lights, rain, wind streaks and lightning, drawn over the finished scene. `speed` is 0..1.
+ * Lights that were queued while drawing are stamped on top after the tint so lamps and tail lights stay bright.
+ */
+export function drawWeatherFx(ctx: Ctx, W: number, H: number, hz: number, wx: Weather, t: number, speed: number) {
+  const dark = Math.min(1, (1 - wx.day) * 0.82 + wx.rain * 0.18 * wx.day);
+  if (dark > 0.01) {
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.fillStyle = mixHex('#ffffff', '#40568a', dark);
+    ctx.fillRect(0, 0, W, H);
+    ctx.globalCompositeOperation = 'source-over';
+  }
+  flushGlows(ctx, 1 + (1 - wx.day) * 0.9);
+
+  // rain: slanted streaks that fall faster the faster you go, leaning with the wind
+  if (wx.rain > 0.04) {
+    const n = Math.floor((30 + 190 * wx.rain) * (gfxState.lite ? 0.45 : 1));
+    const slant = wx.wind * 46 - 10;
+    ctx.strokeStyle = `rgba(200,218,240,${0.18 + 0.3 * wx.rain})`;
+    ctx.lineWidth = Math.max(1, H / 700);
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+      const fall = 700 + hash(i * 1.7) * 600 + speed * 500;
+      const span = W * 1.3;
+      const x = ((((hash(i * 3.1) * span + t * -slant * 3 * (0.5 + hash(i))) % span) + span) % span) - W * 0.15;
+      const y = ((hash(i * 7.7) * (H + 80) + t * fall) % (H + 80)) - 40;
+      const len = 14 + hash(i * 2.3) * 22 + speed * 14;
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + (slant * len) / 40, y + len);
+    }
+    ctx.stroke();
+  }
+
+  // gusts: leaves and dust streaking sideways
+  if (!gfxState.lite && wx.gust * Math.abs(wx.wind) > 0.25) {
+    const dir = wx.wind > 0 ? 1 : -1;
+    ctx.strokeStyle = `rgba(235,242,255,${0.12 + 0.25 * Math.abs(wx.wind)})`;
+    ctx.lineWidth = Math.max(1, H / 600);
+    ctx.beginPath();
+    for (let i = 0; i < 14; i++) {
+      const y = H * (0.2 + 0.6 * hash(i * 5.3));
+      const x = (((hash(i * 9.1) * W * 1.5 + t * 900 * dir * (0.6 + hash(i))) % (W * 1.5)) + W * 1.5) % (W * 1.5) - W * 0.25;
+      ctx.moveTo(x, y);
+      ctx.lineTo(x - dir * (40 + hash(i) * 70), y + 3);
+    }
+    ctx.stroke();
+  }
+
+  // lightning: a jagged bolt on the first flash, and the whole sky lights up
+  if (wx.lightning > 0.01) {
+    const slot = Math.floor(t / 7);
+    if (wx.lightning > 0.5) {
+      const bx = W * (0.15 + 0.7 * hash(slot * 3 + 5));
+      ctx.strokeStyle = `rgba(245,248,255,${wx.lightning})`;
+      ctx.lineWidth = Math.max(2, H / 260);
+      ctx.beginPath();
+      let x = bx;
+      let y = 0;
+      ctx.moveTo(x, y);
+      for (let i = 0; i < 9; i++) {
+        x += (hash(slot + i * 1.3) - 0.5) * W * 0.12;
+        y += hz / 9;
+        ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+    ctx.fillStyle = `rgba(215,228,255,${wx.lightning * 0.45})`;
+    ctx.fillRect(0, 0, W, H);
+  }
 }
 
 // ---------- ground below the horizon ----------

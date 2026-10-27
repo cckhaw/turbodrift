@@ -26,7 +26,7 @@ describe('save parsing', () => {
 
   it.each([
     ['null', null],
-    ['unlocked out of range', { ...base, unlocked: 5 }],
+    ['unlocked out of range', { ...base, unlocked: 6 }],
     ['unlocked not an int', { ...base, unlocked: 1.5 }],
     ['unknown world medal', { ...base, medals: { '9': 1 } }],
     ['bad place', { ...base, medals: { '1': 0 } }],

@@ -14,7 +14,7 @@ export const CODE_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'; // Crockford ba
 const CODE_RE = /^[0-9ABCDEFGHJKMNPQRSTVWXYZ]{12}$/;
 const KARTS = ['comet', 'rocket', 'phantom'];
 /** Keep in step with WORLDS in src/game/worlds.ts (a test checks it). */
-export const WORLD_COUNT = 4;
+export const WORLD_COUNT = 5;
 const CREATE_THROTTLE_SECONDS = 60;
 const bad = (error: string, status = 400): Result => ({ status, body: { error } });
 

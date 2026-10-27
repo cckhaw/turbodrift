@@ -96,6 +96,62 @@ class Synth {
     this.driftSrc.start();
   }
 
+  // ---- weather: rain hiss, wind howl and thunder (the storm world) ----
+  private rainGain?: GainNode;
+  private windGain?: GainNode;
+  private windFilter?: BiquadFilterNode;
+  private weatherSrcs: AudioBufferSourceNode[] = [];
+
+  /** rain 0..1, wind 0..1 (strength of the gust); starts the noise beds on first use. */
+  setWeather(rain: number, wind: number): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.sfxBus) return;
+    if (!this.rainGain) {
+      const mk = (type: BiquadFilterType, freq: number, q: number) => {
+        const src = ctx.createBufferSource();
+        src.buffer = this.noise;
+        src.loop = true;
+        const f = ctx.createBiquadFilter();
+        f.type = type;
+        f.frequency.value = freq;
+        f.Q.value = q;
+        const g = ctx.createGain();
+        g.gain.value = 0;
+        src.connect(f).connect(g).connect(this.sfxBus);
+        src.start();
+        this.weatherSrcs.push(src);
+        return { g, f };
+      };
+      const r = mk('highpass', 2600, 0.5);
+      const w = mk('bandpass', 420, 1.2);
+      this.rainGain = r.g;
+      this.windGain = w.g;
+      this.windFilter = w.f;
+    }
+    const t = ctx.currentTime;
+    this.rainGain.gain.setTargetAtTime(rain * 0.09, t, 0.3);
+    this.windGain!.gain.setTargetAtTime(wind * 0.2, t, 0.25);
+    this.windFilter!.frequency.setTargetAtTime(320 + wind * 500, t, 0.3);
+  }
+
+  thunder(): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.sfxBus) return;
+    const src = ctx.createBufferSource();
+    src.buffer = this.noise;
+    const f = ctx.createBiquadFilter();
+    f.type = 'lowpass';
+    f.frequency.value = 220;
+    const g = ctx.createGain();
+    const t = ctx.currentTime + 0.25;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.5, t + 0.08);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 2.2);
+    src.connect(f).connect(g).connect(this.sfxBus);
+    src.start(t);
+    src.stop(t + 2.4);
+  }
+
   updateEngine(speedPct: number, drifting: boolean, boosting: boolean, fallen: boolean): void {
     const ctx = this.ctx;
     if (!ctx || !this.engOsc || !this.engOsc2 || !this.engGain || !this.engFilter || !this.driftGain) return;
@@ -118,6 +174,15 @@ class Synth {
     }
     this.engOsc = this.engOsc2 = undefined;
     this.driftSrc = undefined;
+    for (const s of this.weatherSrcs) {
+      try {
+        s.stop();
+      } catch {
+        /* already stopped */
+      }
+    }
+    this.weatherSrcs = [];
+    this.rainGain = this.windGain = this.windFilter = undefined;
   }
 
   // ---- sfx ----

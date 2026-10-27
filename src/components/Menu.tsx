@@ -39,12 +39,13 @@ interface Props {
   newPlayer: boolean;
 }
 
-const DIFF_COLOR = ['bg-apple-green/20 text-apple-green', 'bg-apple-yellow/20 text-apple-yellow', 'bg-apple-pink/20 text-apple-pink', 'bg-white/25 text-white'];
+const DIFF_COLOR = ['bg-apple-green/20 text-apple-green', 'bg-apple-yellow/20 text-apple-yellow', 'bg-apple-pink/20 text-apple-pink', 'bg-white/25 text-white', 'bg-red-600/30 text-red-300'];
 const CARD_BG = [
   'linear-gradient(170deg,#1c1f7a,#2b2a8f 40%,#a8327a)',
   'linear-gradient(170deg,#3a1a8c,#8a3fd1 45%,#ff9ad5)',
   'linear-gradient(170deg,#2a0603,#7a1d08 45%,#ff7a2a)',
   'linear-gradient(170deg,#2b86d6,#76c6f4 50%,#e9a566)',
+  'linear-gradient(170deg,#0a1226,#27406b 50%,#6b88b3)',
 ];
 
 export default function Menu(p: Props) {

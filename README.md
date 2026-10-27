@@ -1,6 +1,6 @@
 # Turbo Drift: Neon Circuit
 
-A mobile-first arcade kart racer that runs in the browser: pseudo-3D drift racing against five AI bots across four worlds (three night scenes and a bright daylight desert), with items, three karts, a daily challenge and a global leaderboard whose times are **verified on the server by replaying your inputs**. Nothing to install and no art assets (everything is drawn on a canvas and synthesised with Web Audio).
+A mobile-first arcade kart racer that runs in the browser: pseudo-3D drift racing against five AI bots across five worlds (three night scenes, a bright daylight desert and a god-level storm), with items, three karts, a daily challenge and a global leaderboard whose times are **verified on the server by replaying your inputs**. Nothing to install and no art assets (everything is drawn on a canvas and synthesised with Web Audio).
 
 **Stack:** React 18 · Vite 5 · TypeScript · Tailwind CSS 3 · HTML5 Canvas · Web Audio API · Vercel Functions · Neon Postgres · Vitest.
 
@@ -22,7 +22,7 @@ A mobile-first arcade kart racer that runs in the browser: pseudo-3D drift racin
 ```bash
 npm install
 npm run dev        # http://localhost:5173 (also reachable from your phone on the same network)
-npm test           # 165 tests
+npm test           # 201 tests
 npm run build      # typecheck + production build
 ```
 
@@ -50,14 +50,14 @@ The kart accelerates automatically. On a desktop the race screen shows the keybo
 - **Item boxes** (`?`, race mode only) respawn after 5 s.
 - World 2 has moving **wind gates**, world 3 has static **blocks** and world 4 has stacks of **traffic barrels**; hitting one cuts your speed to 45 %.
 - Worlds 1 and 4 slow you on the grass or sand. On the sky track (world 2) and the lava bridges (world 3), leaving the road means a **fall**: you respawn on the racing line after about a second.
-- 3 laps. In a race you start 4th of 6 and bots rubber-band so the pack stays close.
+- 1, 2 or 3 laps (your choice). In a race you start 4th of 6 and bots rubber-band so the pack stays close.
 
 ## Features
 
 ### Game modes
 - **Practice**: endless solo driving on the track you've selected, with item boxes and no countdown. Nothing is timed, recorded or unlocked, so it's the place to get used to the controls, the HUD and the items. **All three worlds are open in Practice** even if you haven't unlocked them for racing (switching back to Race or Time Trial drops you to your highest unlocked world).
-- **Race**: 3 laps against 5 bots (CyberBot-01, NeonViper, GlitchRider, ByteBlaze, ChromeFang, PulseNova pool), with item boxes. Finishing in the top 3 unlocks the next world.
-- **Time Trial**: solo, no bots or items, racing your own best-lap **ghost** for that kart (the ghost is Time Trial only; in a race it would look like a car restarting at the line every lap). Its times go on the global **Time Trial** leaderboard (races have their own board).
+- **Race**: 1, 2 or 3 laps (pick on the menu or in Settings → Race) against 5 bots (CyberBot-01, NeonViper, GlitchRider, ByteBlaze, ChromeFang, PulseNova pool), with item boxes. Finishing in the top 3 unlocks the next world.
+- **Time Trial**: solo, no bots or items, with no opponents. If you switch on Settings → Race → *Best-lap ghost* you also see your fastest lap as a see-through car (off by default, because a lone car on the road reads as an opponent). Time Trial ghosts are never shown in races. Its times go on the global **Time Trial** leaderboard (races have their own board).
 - **Daily challenge**: one track per UTC day for everyone (the world rotates 1 → 2 → 3 → 4, the seed is derived from the date), played as a Time Trial. Because everyone gets the same seed, the leaderboard for that seed *is* the daily board. The menu card shows your best, the time until the reset, a ✅ once done and a 🔥 streak of consecutive days.
 
 
@@ -76,8 +76,9 @@ A guided lap on an easy fixed track (world 1, seed 4242), run in endless Practic
 | 2 | Cyber Stratosphere | Intermediate | medium | up to 5 | 1800 segments | sky track over a cloud sea, balloons, floating islands, light rings, moving wind gates, falls |
 | 3 | Obsidian Core | Expert | narrow | up to 6.5 incl. hairpins | 2000 segments | lava-lit bridges, volcanoes, brazier torches, steel gantries, barrier blocks, falls |
 | 4 | Sunbaked Mesa | Intermediate | wide | long sweepers (max 4) | 1700 segments | **daylight** desert highway: sand slows you, guard rails, traffic barrels, mesas |
+| 5 | Tempest Peak | **God** | narrowest | up to 6.5 incl. hairpins | 2200 segments | a mountain pass in a storm: **day turns to night, rain, gusting wind**, barriers and falls |
 
-World 1 is open; each next world unlocks with a podium finish (top 3) in the one before it (so world 4 follows world 3), and Practice opens all of them. A challenge link or the daily challenge opens its world regardless. Progress, medals and the daily streak are stored on the device and can be synced with [cloud save](#cloud-save).
+World 1 is open; each next world unlocks with a podium finish (top 3) in the one before it (so Tempest Peak follows Sunbaked Mesa), and Practice opens all of them. The daily challenge rotates through the first four worlds (the god-level one is never a daily). A challenge link or the daily challenge opens its world regardless. Progress, medals and the daily streak are stored on the device and can be synced with [cloud save](#cloud-save).
 
 ### Karts
 
@@ -101,7 +102,7 @@ Waypoint following along a precomputed racing line (`track.ts`), look-ahead lane
 `?world=2&seed=98765` rebuilds the identical track on any device (mulberry32 PRNG, `src/utils/rng.ts`). The menu has a seed field, a dice button for a random seed and a copy-link button; the URL always reflects the selection. **Share Scorecard** copies an emoji race matrix (⬜ cars ahead, 🟦 you, ⬛ cars behind, one row per lap) with the lap times and a challenge link; on mobile it uses the native share sheet from the leaderboard modal. Time Trials share lap times instead.
 
 ### Leaderboard
-Board modal with a **Race / Time Trial** switch (it opens on the mode you're playing) and two tabs: the current seed, and the best times across the world. Top 25 by best lap (one row per player per track), with your own rows highlighted and an editable name. It shows whether you are looking at the global board, or the offline fallback (your local times plus rival ghosts).
+Board modal with a row of **world** tabs (look at any world without going back to the menu), a **Race / Trial** switch and a **1 / 2 / 3 lap** switch (it opens on the mode and lap count you're playing), plus two tabs for the world you're on: the current seed, and the best times across the world. Every lap count has its own board in every world. **Bots** fill empty places up to 15 rows (labelled BOT, generated on the device and never stored), so a new track always has rivals to chase and your real time slots in among them. Top 25 by best lap (one row per player per track), with your own rows highlighted and an editable name. It shows whether you are looking at the global board, or the offline fallback (your local times plus rival ghosts).
 
 ### UI and presentation
 Apple-style glass interface: frosted panels (`rgba(255,255,255,0.08)` with a 28 px blur), 24 px squircle corners, the SF system font stack, Apple Blue `#007AFF` and neon pink `#FF2D55` on deep obsidian `#090D16`. Safe-area aware and thumb-first. Pseudo-3D road with hills, fog, particles, speed lines, spin-outs and screen shake.
@@ -113,6 +114,8 @@ Each world is dressed as a lively, saturated scene rather than a flat backdrop (
 - **Cyber Stratosphere**: a sunrise over a sea of cloud, aurora ribbons, soft puffy cloud banks, floating islands with waterfalls of light, hot-air balloons, wind turbines, crystal lanterns and glowing rings over the road.
 - **Obsidian Core**: smoking volcanoes with lava falls, rising embers, a lava sea with glowing cracks, flame braziers lining the bridge, hazard-striped steel pylons and gantries, rocks veined with lava.
 - **Sunbaked Mesa** (the one world in full daylight): a bright blue sky with fat cumulus and a sun glare, three layers of flat-topped and mushroom mesas fading into the haze, a passing helicopter, orange sand, a grey highway with a double yellow centre line, white lane dashes, red and white kerbs, a gravel shoulder and steel guard rails, curved highway lamps, saguaro cacti, shrubs, yellow warning signs, feather flags, parked trailers, green overhead exit-sign gantries and orange traffic barrels.
+- **Tempest Peak** (god level): a sky that changes while you race. A full day takes three minutes: a bright morning with a clear start, a pink dusk, a dark night lit by sodium lamps, a lighthouse beam and lightning, and back to dawn. Rain comes and goes in fronts, with streaks that lean in the wind and a hiss and rumble of thunder; gusts blow in from both sides with a warning on the HUD (🌧 % and 💨 arrow beside the lap time, plus a GUST toast).
+  **The weather changes the driving, not just the look.** Gusts push every kart sideways, harder the faster it goes (a push of up to 0.6 road-halves per second), and rain makes the road greasy: bends throw you wider and the wheel bites less. It is all a pure function of the simulation clock (`src/game/weather.ts`), so the server's replay re-creates exactly the same gusts and downpours and verifies the time like any other world. Light-blue peaks, snow, dark pines, wind turbines, steel pylons and warning-striped barriers line a narrow, hilly road with a long drop on both sides.
 - **Karts** are round and chunky: bubble bodies, fat capsule tyres, ring exhausts with orange-and-blue flames, a driver with a round cap, ears and a badge, drawn slightly larger than their hit box so they read on a phone. Comet is the balanced bubble, Rocket is a taller egg with a wide wing and Phantom a low, wide pod with swept side fins.
 
 Decoration comes from its own seeded random stream, so it never changes a track's layout (pads, boxes, hazards, replays and ghosts are unaffected). The static layers (sky, skylines, clouds, moon, sun) are painted once into offscreen canvases; the rest is drawn per frame. **Battery saver** drops the extra decoration (glows, fireworks, search lights, aurora, embers, window lights), and the game does the same by itself for the rest of the session if frames average slower than about 38 fps for a few seconds.
@@ -120,6 +123,7 @@ Decoration comes from its own seeded random stream, so it never changes a track'
 ### Audio, haptics and PWA
 - **Audio**: everything is synthesised live: engine tone that follows speed, drift hiss, countdown, pickups, hits, lap and finish jingles, and a procedural synthwave loop with a different tempo and scale per world.
 - **Haptics**: vibration for drift levels, boosts, pads, hits, falls, laps and the finish (browsers that support `navigator.vibrate`, so not iOS Safari).
+- **Add to home screen**: on a phone, in a browser tab, a sheet appears a few seconds after the menu opens: Share → Add to Home Screen on iOS, Chrome's own install button (or the ⋮ menu steps) on Android. *Maybe later* snoozes it for 3 days, *Don't show again* switches it off, and Settings → Help has an *Add to home screen* button to bring it back. It never shows on a desktop or once the game is launched from the home screen.
 - **PWA**: installable (fullscreen, portrait manifest and icons) with an offline service worker (network-first pages, cache-first assets, `sw.js` is served `no-cache`).
 
 ## Settings
@@ -129,6 +133,7 @@ Gear icon on the menu, or **Settings** in the pause menu (the **?** button next 
 | Section | Options |
 |---|---|
 | Help | replay the tutorial, controls guide, practice mode (the tutorial and practice are disabled while a race is in progress) |
+| Race | laps per race (1, 2 or 3), best-lap ghost in Time Trial (off by default) |
 | Audio | sound on/off, music volume, effects volume |
 | Controls | steering sensitivity (how far to drag for full lock), vibration |
 | Graphics | battery saver (lower render resolution), screen shake, race panels: **Full** (map + road ahead), **Compact** (small map + bend call-out) or **Off** |
@@ -167,7 +172,7 @@ There is no `.env` to create for local play.
 | `turbodrift.synccode` | your cloud-save code, if enabled |
 
 ### Database
-Two tables, created automatically on the first API request (`db/schema.sql` is a reference copy): `scores` (one row per device + world + seed + mode, keeping the best times; `mode` is `race` or `trial`, and older rows are time trials, added automatically) and `saves` (cloud saves keyed by sync code). No migration step.
+Two tables, created automatically on the first API request (`db/schema.sql` is a reference copy): `scores` (one row per device + world + seed + mode + laps, keeping the best times; `mode` is `race` or `trial`, and older rows are time trials, added automatically) and `saves` (cloud saves keyed by sync code). No migration step.
 
 ## Architecture
 
@@ -193,7 +198,7 @@ Notes:
 ## Leaderboard, anti-cheat and cloud save
 
 ### Server-verified times
-A Race or Time Trial records your steering and drift inputs, plus the moments you pressed the item button in a race (about 20 KB for a full race). The client submits **only that recording**, never a time. `api/score.ts` re-runs the real game engine headlessly with those inputs (`src/game/verify.ts`) and stores the times *the simulation* produced, so a tampered client can't claim a lap it didn't drive. A replay is rejected if it is malformed, doesn't finish 3 laps, or gives a lap faster than a per-world physical limit. Each device is limited to one submission per 45 s.
+A Race or Time Trial of 1, 2 or 3 laps records your steering and drift inputs, plus the moments you pressed the item button in a race (about 20 KB for a full race). The client submits **only that recording**, never a time. `api/score.ts` re-runs the real game engine headlessly with those inputs (`src/game/verify.ts`) and stores the times *the simulation* produced, so a tampered client can't claim a lap it didn't drive. A replay is rejected if it is malformed, doesn't finish 3 laps, or gives a lap faster than a per-world physical limit. Each device is limited to one submission per 45 s.
 
 Races are replayed too: the engine is deterministic (bots, items and rubber-banding all run from the track seed), so the server re-runs the whole race, bots included, from your inputs and item presses (well under a second). Races and time trials rank on **separate boards**, and both still count for local records; races also drive world unlocks.
 
@@ -209,13 +214,13 @@ All endpoints return JSON with `Cache-Control: no-store`; errors are `{ "error":
 
 | Method & path | Body / query | Success | Errors |
 |---|---|---|---|
-| `GET /api/leaderboard` | `?world=1..4`, optional `&seed=N` and `&mode=race\|trial` (default `trial`) | `[{ name, lap_ms, total_ms, world, seed }]` (top 25) | 400 bad world/seed, 503 |
+| `GET /api/leaderboard` | `?world=1..5`, optional `&seed=N`, `&mode=race\|trial` (default `trial`) and `&laps=1\|2\|3` (default 3) | `[{ name, lap_ms, total_ms, world, seed }]` (top 25) | 400 bad world/seed, 503 |
 | `POST /api/score` | `{ clientId, name, replay }` | `{ ok: true, lapMs, totalMs }` (the **server's** times) | 400 invalid or unverifiable replay, 429 slow down, 503 |
 | `POST /api/save` | `{ unlocked, medals, days, name, kart }` | `{ code, save }` | 400 bad save, 429 slow down, 503 |
 | `GET /api/save` | `?code=XXXX-XXXX-XXXX` (case and dashes forgiven) | `{ save }` | 400 bad code, 404 unknown code, 503 |
 | `PUT /api/save` | `{ code, save }` | `{ save }` (merged, never lower) | 400, 404, 503 |
 
-`replay` is `{ v: 1, world, seed, kart, steps, data, mode?, items? }` (`mode` is `race` or `trial`, default `trial`; `items` lists the steps at which the item button was pressed, races only), where `data` is base64 of run-length-encoded inputs (see `src/game/replay.ts`).
+`replay` is `{ v: 1, world, seed, kart, steps, data, mode?, laps?, items? }` (`mode` is `race` or `trial`, default `trial`; `laps` is 1, 2 or 3, default 3; `items` lists the steps at which the item button was pressed, races only), where `data` is base64 of run-length-encoded inputs (see `src/game/replay.ts`).
 
 ## Testing
 
@@ -224,7 +229,7 @@ npm test             # vitest run
 npm run typecheck
 ```
 
-165 tests in `tests/` (they also run in CI):
+201 tests in `tests/` (they also run in CI):
 
 | File | Covers |
 |---|---|
@@ -237,8 +242,11 @@ npm run typecheck
 | `minimap`, `lookahead`, `hud`, `settings` | closed non-pinching track maps for every world and seed, bend detection (direction, severity, distance, S-bends, wrap past the finish), map marks and dot spreading, the HUD's racer markers (one *you*, unique positions) and the panel setting |
 | `race-board` | race submissions: the server re-runs a whole race with bots and items and matches the client, separate race / time-trial boards, item-press validation, the database upgrade from the old schema, plausibility floors with item turbos |
 | `touch` | touch steering curve, dead zone and smoothing, arrow pads, the touch settings, and drift assist (starts drifts in bends, boosts, and is recorded so the server reproduces it) |
-| `layout` | golden fingerprints: the road, pads, hazards and item boxes of 16 world+seed tracks never change |
+| `layout` | golden fingerprints: the road, pads, hazards and item boxes of 20 world+seed tracks never change |
 | `render` | every sprite, backdrop, kart, hazard and prop draws without non-finite numbers or the negative radii that make a browser throw, at every distance, world and variation, in both full and trimmed (lite) modes; the decoration never alters the layout |
+| `weather` | the storm's cycle (dry bright start, night, downpours, gusts both ways, lightning only in heavy rain, smooth changes), its effect on grip, that world being the hardest, and the server replaying wind and rain exactly in a trial and a race |
+| `install` | which phones get the add-to-home-screen reminder (iPhone, iPad as a Mac, Android), snoozing and switching it off |
+| `laps` | 1, 2 and 3 lap runs, replay checks, a board per lap count, the database upgrade, and bot scores filling boards |
 | `ghost`, `daily`, `items`, `format-share`, `cleanup` | ghosts per kart and settings, daily rotation and streaks, item odds and kart stats, scorecard text, deployment selection |
 
 API tests run against an in-memory Postgres ([PGlite](https://pglite.dev)), so no database is needed.

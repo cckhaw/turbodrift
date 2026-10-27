@@ -4,7 +4,7 @@
 export type Sql = (strings: TemplateStringsArray, ...values: unknown[]) => Promise<any[]>;
 
 /** Fastest physically plausible lap per world: top speed with permanent boost, minus 10%. */
-export const MIN_LAP_MS: Record<number, number> = { 1: 26000, 2: 30000, 3: 32000, 4: 28000 };
+export const MIN_LAP_MS: Record<number, number> = { 1: 26000, 2: 30000, 3: 32000, 4: 28000, 5: 33000 };
 const MAX_LAP_MS = 600000;
 const MAX_TOTAL_MS = 3600000;
 const isInt = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v);

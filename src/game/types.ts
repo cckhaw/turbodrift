@@ -25,7 +25,10 @@ export type SceneryKind =
   | 'roadsign'
   | 'shrub'
   | 'flag'
-  | 'truck';
+  | 'truck'
+  // storm world
+  | 'pine'
+  | 'lighthouse';
 import type { Item } from './items.js';
 import type { Ahead } from './lookahead.js';
 
@@ -119,7 +122,7 @@ export interface WorldConfig {
   name: string;
   emoji: string;
   tagline: string;
-  difficulty: 'Beginner' | 'Intermediate' | 'Expert';
+  difficulty: 'Beginner' | 'Intermediate' | 'Expert' | 'God';
   blurb: string;
   // geometry
   roadWidth: number;
@@ -148,6 +151,8 @@ export interface WorldConfig {
   sceneryDensity: number;
   windGates: boolean;
   blocks: boolean;
+  /** a changing sky: day to night, rain and gusty wind (see weather.ts) */
+  weather?: boolean;
   music: { bpm: number; root: number; scale: number[] };
 }
 
@@ -170,6 +175,8 @@ export interface HudSnapshot {
   itemRolling: boolean;
   shield: boolean;
   /** Everyone on track for the map: `pos` is their race position (0 for the ghost), `t` is how far round the lap (0..1). */
+  /** the storm world's sky right now (null elsewhere) */
+  weather: { day: number; rain: number; wind: number; gust: number } | null;
   racers: { id: number; color: string; you: boolean; pos: number; t: number; ghost?: boolean }[];
   ahead: Ahead;
 }

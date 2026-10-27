@@ -19,11 +19,11 @@ describe('daily challenge', () => {
       const d = dailyFor(new Date(Date.UTC(2026, 0, 1 + i)));
       worlds.add(d.world);
       expect(d.world).toBeGreaterThanOrEqual(1);
-      expect(d.world).toBeLessThanOrEqual(WORLDS.length);
+      expect(d.world).toBeLessThanOrEqual(DAILY_WORLDS);
       expect(Number.isInteger(d.seed) && d.seed >= 1 && d.seed <= 999999999).toBe(true);
     }
-    expect(worlds.size).toBe(WORLDS.length); // rotates through every world
-    expect(DAILY_WORLDS).toBe(WORLDS.length);
+    expect(worlds.size).toBe(DAILY_WORLDS); // rotates through every world that is open to everyone
+    expect(DAILY_WORLDS).toBe(WORLDS.filter((w) => w.difficulty !== 'God').length); // the god-level world is not a daily
   });
 
   it('counts down to the next UTC midnight', () => {

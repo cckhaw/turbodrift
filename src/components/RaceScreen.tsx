@@ -199,6 +199,15 @@ export default function RaceScreen({ world, seed, mode, kart, laps = 3, onFinish
             <Flag size={10} /> {mode === 'practice' ? 'Lap time' : `Lap ${hud?.lap ?? 1}/${hud?.laps ?? 3}`}
           </p>
           <p className="font-mono text-lg font-semibold tabular-nums">{formatTime(hud?.lapTime ?? 0)}</p>
+          {hud?.weather && (
+            <p className="mt-0.5 flex items-center justify-center gap-2 text-[11px] font-semibold text-white/75" aria-label="Weather">
+              <span>{hud.weather.day > 0.55 ? '☀️' : hud.weather.day > 0.25 ? '🌆' : '🌙'}</span>
+              <span className={hud.weather.rain > 0.5 ? 'text-sky-300' : ''}>🌧 {Math.round(hud.weather.rain * 100)}%</span>
+              <span className={Math.abs(hud.weather.wind) > 0.6 ? 'font-extrabold text-apple-yellow' : ''}>
+                💨 {hud.weather.wind < -0.08 ? '⬅' : hud.weather.wind > 0.08 ? '➜' : '·'}
+              </span>
+            </p>
+          )}
         </div>
         <button aria-label="Pause" onClick={() => setPaused(true)} className="glass pointer-events-auto z-30 flex h-12 w-12 items-center justify-center !rounded-2xl active:scale-95">
           <Pause size={20} />

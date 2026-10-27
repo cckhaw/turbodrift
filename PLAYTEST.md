@@ -20,6 +20,13 @@ Automated checks (emulated 360×640 touch phone, 4× CPU throttle, Playwright) c
 - [ ] Phone not uncomfortably hot after 3 races
 - [ ] Audio starts after first tap; no crackle
 
+## New in this round
+- [ ] Laps 1/2/3 on the menu and in Settings → Race; the Board follows your choice and each lap count has its own list
+- [ ] Leaderboard: tap the world chips to see every world without leaving the Board; bots fill empty places
+- [ ] iPhone Safari and Android Chrome: the add-to-home-screen sheet appears once, snoozes, and does not appear from the installed app
+- [ ] Tempest Peak (practice, world 5): watch a full day-to-night cycle; gusts push the kart and show a GUST toast; rain is heavy but readable; the frame rate holds up in the rain at night (Battery saver if not)
+- [ ] Time Trial shows no see-through car unless the ghost is switched on
+
 ## Platform
 - [ ] Android Chrome: vibration on drifts/boosts
 - [ ] iOS Safari: no rubber-band scroll or pull-to-refresh during play; safe areas respected (notch, home bar)

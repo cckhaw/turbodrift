@@ -116,10 +116,41 @@ function Desert() {
   );
 }
 
+function Storm() {
+  return (
+    <>
+      <path d="M0 90L34 40l14 14 20-34 22 40 16-14 30 44z" fill="#2c3a55" />
+      <path d="M120 90l36-52 12 14 22-36 26 50 14-12 36 36z" fill="#222f48" />
+      <path d="M210 90l30-30 20 12 40-38v56z" fill="#1a2438" />
+      <path d="M34 40l6 8-6-2-4 4zM164 54l8-16 8 12z" fill="#e9f1ff" opacity="0.85" />
+      {[40, 110, 180, 250].map((x, i) => (
+        <g key={i} fill="#3d4a63">
+          <circle cx={x} cy={10 + (i % 2) * 8} r="22" />
+          <circle cx={x + 18} cy={16 + (i % 2) * 8} r="16" />
+          <circle cx={x - 16} cy={18 + (i % 2) * 8} r="15" />
+        </g>
+      ))}
+      <path d="M156 4l-14 28h12l-10 26 22-34h-12z" fill="#fff3a8" />
+      <rect x="0" y="78" width="300" height="12" fill="#101a2b" />
+      <path d="M0 84h300" stroke="#ffd60a" strokeWidth="3" strokeDasharray="12 8" />
+      <g stroke="#9fb4d6" strokeWidth="0.8" opacity="0.7">
+        {Array.from({ length: 28 }, (_, i) => (
+          <path key={i} d={`M${i * 11 + 4} ${(i * 13) % 50}l-6 14`} />
+        ))}
+      </g>
+      <g transform="translate(262 40)">
+        <path d="M-5 38l3-26h4l3 26z" fill="#eef2f8" />
+        <rect x="-4" y="22" width="8" height="5" fill="#d83a3a" />
+        <rect x="-3" y="8" width="6" height="5" fill="#ffd9a0" />
+      </g>
+    </>
+  );
+}
+
 export default function WorldArt({ world, dim = false }: { world: number; dim?: boolean }) {
   return (
     <svg viewBox="0 0 300 90" preserveAspectRatio="xMidYMax slice" aria-hidden="true" className={`pointer-events-none absolute inset-x-0 bottom-0 h-[60px] w-full ${dim ? 'opacity-25 grayscale' : 'opacity-90'}`} style={{ maskImage: 'linear-gradient(to top, black 55%, transparent)', WebkitMaskImage: 'linear-gradient(to top, black 55%, transparent)' }}>
-      {world === 1 ? <City /> : world === 2 ? <Sky /> : world === 3 ? <Volcano /> : <Desert />}
+      {world === 1 ? <City /> : world === 2 ? <Sky /> : world === 3 ? <Volcano /> : world === 4 ? <Desert /> : <Storm />}
     </svg>
   );
 }
