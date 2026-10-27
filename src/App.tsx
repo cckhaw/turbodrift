@@ -12,6 +12,7 @@ import { WORLDS } from './game/worlds';
 import type { RaceResult } from './game/types';
 import { flushPending, getPlayerName, saveScore, watchConnectivity } from './utils/leaderboard';
 import { syncCloud } from './utils/cloud';
+import { loadSettings, saveSettings } from './utils/settings';
 import { loadProgress, recordFinish, type Progress } from './utils/progress';
 import { randomSeed } from './utils/rng';
 import { markTutorialSeen, TUTORIAL_SEED, TUTORIAL_WORLD, tutorialSeen } from './utils/tutorial';
@@ -39,6 +40,7 @@ export default function App() {
   const [world, setWorld] = useState(initial.world);
   const [seed, setSeed] = useState(initial.seed);
   const [fromLink, setFromLink] = useState(initial.link);
+  const [laps, setLaps] = useState<1 | 2 | 3>(() => loadSettings().laps);
   const [daily, setDaily] = useState(() => dailyFor());
   const [dailyTick, setDailyTick] = useState(0);
   const [runId, setRunId] = useState(0);
@@ -102,7 +104,7 @@ export default function App() {
       setDailyTick((n) => n + 1);
     }
     void syncCloud().then((p) => p && setProgress(p));
-    void saveScore({ name: getPlayerName(), lapMs: r.bestLap, totalMs: r.totalTime, world: r.world, seed: r.seed, mode: r.mode === 'race' ? 'race' : 'trial' }, r.replay);
+    void saveScore({ name: getPlayerName(), lapMs: r.bestLap, totalMs: r.totalTime, world: r.world, seed: r.seed, mode: r.mode === 'race' ? 'race' : 'trial', laps: r.laps }, r.replay);
     setResult(r);
     setScreen('results');
   }, []);
@@ -159,6 +161,11 @@ export default function App() {
           progress={progress}
           muted={muted}
           mode={mode}
+          laps={laps}
+          onLaps={(n) => {
+            saveSettings({ laps: n });
+            setLaps(n);
+          }}
           onMode={(m) => {
             saveMode(m);
             setModeState(m);
@@ -185,7 +192,7 @@ export default function App() {
           }}
         />
       )}
-      {screen !== 'menu' && <RaceScreen key={runId} world={tutorial ? TUTORIAL_WORLD : world} seed={tutorial ? TUTORIAL_SEED : seed} mode={tutorial ? 'practice' : mode} kart={kart} tutorial={tutorial} onFinish={finish} onQuit={quit} onSettings={() => setSettingsOpen(true)} />}
+      {screen !== 'menu' && <RaceScreen key={runId} world={tutorial ? TUTORIAL_WORLD : world} seed={tutorial ? TUTORIAL_SEED : seed} mode={tutorial ? 'practice' : mode} kart={kart} laps={laps} tutorial={tutorial} onFinish={finish} onQuit={quit} onSettings={() => setSettingsOpen(true)} />}
       {screen === 'results' && result && (
         <Results
           result={result}
@@ -217,7 +224,10 @@ export default function App() {
             setMuted(!muted);
           }}
           onProgress={setProgress}
-          onClose={() => setSettingsOpen(false)}
+          onClose={() => {
+            setSettingsOpen(false);
+            setLaps(loadSettings().laps); // may have been changed in there
+          }}
           onTutorial={startTutorial}
           onHowTo={() => setHowTo(true)}
           onPractice={startPractice}
@@ -247,7 +257,7 @@ export default function App() {
           </div>
         </div>
       )}
-      {board && <LeaderboardModal world={world} seed={seed} last={result} mode={mode} onClose={() => setBoard(false)} />}
+      {board && <LeaderboardModal world={world} seed={seed} last={result} mode={mode} laps={laps} onClose={() => setBoard(false)} />}
     </div>
   );
 }

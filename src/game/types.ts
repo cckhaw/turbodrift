@@ -177,6 +177,7 @@ export interface HudSnapshot {
 import type { Replay } from './replay.js';
 
 export interface RaceResult {
+  laps: number;
   replay?: Replay;
   mode: 'race' | 'trial';
   kart: string;

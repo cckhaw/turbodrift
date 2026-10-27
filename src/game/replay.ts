@@ -33,6 +33,8 @@ export interface Replay {
   seed: number;
   kart: string;
   steps: number;
+  /** laps in the run; absent means 3 */
+  laps?: number;
   /** absent on older recordings, which are always time trials */
   mode?: 'trial' | 'race';
   /** step numbers at which the item button was pressed; races only */

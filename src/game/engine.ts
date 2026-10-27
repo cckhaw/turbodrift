@@ -4,7 +4,7 @@ import { Rng, hashSeed } from '../utils/rng.js';
 import { haptic } from '../utils/haptics.js';
 import { loadSettings, type Settings } from '../utils/settings.js';
 import { GHOST_DT, ghostAt, loadGhost, saveGhost, type Ghost } from '../utils/ghost.js';
-import { BOT_COLORS, BOT_NAMES, LAPS, SEG_LENGTH, WORLDS } from './worlds.js';
+import { BOT_COLORS, BOT_NAMES, DEFAULT_LAPS, SEG_LENGTH, WORLDS } from './worlds.js';
 import { generateTrack } from './track.js';
 import { lookAhead } from './lookahead.js';
 import { KARTS, kartById, type KartSpec } from './karts.js';
@@ -57,6 +57,8 @@ export interface EngineOptions {
   /** race: bots + items · trial: solo, verified for the leaderboard · practice: solo, items, endless, nothing recorded */
   mode?: 'race' | 'trial' | 'practice';
   kart?: string;
+  /** laps in a race or time trial (1, 2 or 3; default 3). Practice is endless. */
+  laps?: number;
 }
 
 export class Engine {
@@ -133,6 +135,7 @@ export class Engine {
   private settings: Settings;
   private kart: KartSpec;
   private mode: 'race' | 'trial' | 'practice';
+  private laps: number;
   private countdownLen = COUNTDOWN;
   private itemRng: Rng;
   private itemRollT = 0;
@@ -148,6 +151,7 @@ export class Engine {
     this.backdrop = makeBackdrop(() => r.next());
     this.settings = loadSettings();
     this.mode = o.mode ?? 'race';
+    this.laps = o.laps === 1 || o.laps === 2 ? o.laps : DEFAULT_LAPS;
     if (this.mode === 'practice') this.countdownLen = 0.6; // no countdown, just GO
     this.kart = kartById(o.kart ?? KARTS[0].id);
     this.itemRng = new Rng(hashSeed(o.world, o.seed, 555));
@@ -156,7 +160,8 @@ export class Engine {
     this.setupGrid(r);
     // the best-lap ghost belongs to Time Trial: in a race a translucent car restarting at the line every lap just looks like a bug
     this.ghost = this.mode === 'trial' ? loadGhost(o.world, o.seed, this.kart.id) : null;
-    if (this.ghost) this.ghostCar = { ...this.makeCar(99, 'BEST', '#ffffff', '#ffffff', false), ghost: true };
+    // ...and even there the car is only drawn if the player asks for it: a lone translucent car reads as an opponent
+    if (this.ghost && this.settings.ghost) this.ghostCar = { ...this.makeCar(99, 'BEST', '#ffffff', '#ffffff', false), ghost: true };
     this.resize();
     if (typeof ResizeObserver !== 'undefined') {
       this.resizeObs = new ResizeObserver(() => this.resize());
@@ -594,6 +599,7 @@ export class Engine {
   getReplay(): Replay | null {
     if (this.mode === 'practice' || !this.recorder.valid || !this.finalResult || this.replayRuns) return null;
     const r: Replay = { v: 1, world: this.o.world, seed: this.o.seed, kart: this.kart.id, steps: this.recorder.total, data: encodeRuns(this.recorder.runs) };
+    if (this.laps !== DEFAULT_LAPS) r.laps = this.laps;
     if (this.mode === 'race') {
       r.mode = 'race';
       r.items = this.recorder.items;
@@ -748,7 +754,7 @@ export class Engine {
     const wd = this.wd;
     const N = this.track.segments.length;
     const playerDist = this.player.dist;
-    const finalLap = this.player.lap >= LAPS;
+    const finalLap = this.player.lap >= this.laps;
     for (const b of this.cars) {
       if (b.isPlayer) continue;
       if (frozen) {
@@ -788,8 +794,8 @@ export class Engine {
       const prev = b.dist;
       b.dist += b.speed * dt;
       this.collectBoxes(b, prev);
-      b.lap = clamp(Math.floor(b.dist / this.track.length) + 1, 1, LAPS + 1);
-      if (b.finishTime == null && b.dist >= LAPS * this.track.length) b.finishTime = this.raceT * 1000;
+      b.lap = clamp(Math.floor(b.dist / this.track.length) + 1, 1, this.laps + 1);
+      if (b.finishTime == null && b.dist >= this.laps * this.track.length) b.finishTime = this.raceT * 1000;
     }
   }
 
@@ -837,13 +843,13 @@ export class Engine {
       p.lap = n;
       return;
     }
-    const lap = clamp(Math.floor(p.dist / this.track.length) + 1, 1, LAPS + 1);
+    const lap = clamp(Math.floor(p.dist / this.track.length) + 1, 1, this.laps + 1);
     if (lap > this.playerLap && this.state === 'racing') {
       const lapMs = this.lapT * 1000;
       if (this.mode === 'trial' && this.rec.d.length > 5 && (!this.ghost || lapMs < this.ghost.lapMs)) {
         this.ghost = { lapMs, d: this.rec.d, x: this.rec.x };
         saveGhost(this.o.world, this.o.seed, this.kart.id, this.ghost);
-        this.ghostCar ??= { ...this.makeCar(99, 'BEST', '#ffffff', '#ffffff', false), ghost: true };
+        if (this.settings.ghost) this.ghostCar ??= { ...this.makeCar(99, 'BEST', '#ffffff', '#ffffff', false), ghost: true };
         this.say('NEW BEST LAP');
       }
       this.rec = { lapMs: 0, d: [], x: [] };
@@ -852,7 +858,7 @@ export class Engine {
       this.lapPositions.push(this.rank().indexOf(p) + 1);
       this.lapT = 0;
       this.playerLap = lap;
-      if (lap > LAPS) {
+      if (lap > this.laps) {
         p.finishTime = this.raceT * 1000;
         this.state = 'finished';
         this.drifting = false;
@@ -864,18 +870,19 @@ export class Engine {
       } else {
         synth.lap();
         haptic.lap();
-        this.say(lap === LAPS ? 'FINAL LAP' : `LAP ${lap}`);
+        this.say(lap === this.laps ? 'FINAL LAP' : `LAP ${lap}`);
       }
     }
-    p.lap = Math.min(lap, LAPS);
+    p.lap = Math.min(lap, this.laps);
   }
 
   private buildResult(): RaceResult {
     const ranked = this.rank();
     const p = this.player;
-    const remaining = (c: Car) => Math.max(0, LAPS * this.track.length - c.dist) / Math.max(c.speed, this.wd.maxSpeed * 0.5);
+    const remaining = (c: Car) => Math.max(0, this.laps * this.track.length - c.dist) / Math.max(c.speed, this.wd.maxSpeed * 0.5);
     return {
       mode: this.mode === 'trial' ? 'trial' : 'race', // practice never produces a result
+      laps: this.laps,
       kart: this.kart.id,
       world: this.o.world,
       seed: this.o.seed,
@@ -904,8 +911,8 @@ export class Engine {
     this.o.onHud({
       position: Math.max(1, ranked.indexOf(p) + 1),
       total: this.cars.length,
-      lap: Math.min(p.lap, LAPS),
-      laps: LAPS,
+      lap: Math.min(p.lap, this.laps),
+      laps: this.laps,
       kmh: Math.round((p.speed / this.wd.maxSpeed) * 240),
       lapTime: this.lapT * 1000,
       raceTime: Math.max(0, this.raceT) * 1000,

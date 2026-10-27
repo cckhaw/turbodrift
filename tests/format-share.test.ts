@@ -18,6 +18,7 @@ describe('format', () => {
 describe('share', () => {
   const result: RaceResult = {
     mode: 'race',
+    laps: 3,
     kart: 'comet',
     world: 2,
     seed: 98765,

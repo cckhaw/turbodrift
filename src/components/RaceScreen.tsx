@@ -20,6 +20,8 @@ interface Props {
   seed: number;
   mode: Mode;
   kart: string;
+  /** laps for a race or time trial (1, 2 or 3) */
+  laps?: number;
   onFinish: (r: RaceResult) => void;
   onQuit: () => void;
   onSettings: () => void;
@@ -29,7 +31,7 @@ interface Props {
 
 const LVL_COLOR = ['#ffffff', '#5AC8FA', '#FF2D55'];
 
-export default function RaceScreen({ world, seed, mode, kart, onFinish, onQuit, onSettings, tutorial = false }: Props) {
+export default function RaceScreen({ world, seed, mode, kart, laps = 3, onFinish, onQuit, onSettings, tutorial = false }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<Engine | null>(null);
   const finishRef = useRef(onFinish);
@@ -61,7 +63,7 @@ export default function RaceScreen({ world, seed, mode, kart, onFinish, onQuit, 
   const w = WORLDS[world - 1];
 
   useEffect(() => {
-    const engine = new Engine({ canvas: canvasRef.current!, world, seed, onHud: setHud, onFinish: (r) => finishRef.current(r), mode, kart });
+    const engine = new Engine({ canvas: canvasRef.current!, world, seed, onHud: setHud, onFinish: (r) => finishRef.current(r), mode, kart, laps });
     engineRef.current = engine;
     engine.start();
     // touch steering is eased towards the thumb's position every frame (the keyboard writes straight through)
@@ -117,7 +119,7 @@ export default function RaceScreen({ world, seed, mode, kart, onFinish, onQuit, 
       engine.destroy();
       engineRef.current = null;
     };
-  }, [world, seed, mode, kart]);
+  }, [world, seed, mode, kart, laps]);
 
   useEffect(() => {
     engineRef.current?.setPaused(paused);

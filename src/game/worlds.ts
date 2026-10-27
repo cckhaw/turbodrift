@@ -1,7 +1,9 @@
 import type { WorldConfig } from './types.js';
 
 export const SEG_LENGTH = 200;
-export const LAPS = 3;
+/** Laps in a race when the player hasn't chosen (they can pick 1, 2 or 3). */
+export const DEFAULT_LAPS = 3;
+export const LAP_OPTIONS = [1, 2, 3] as const;
 
 export const WORLDS: WorldConfig[] = [
   {

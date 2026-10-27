@@ -11,6 +11,10 @@ export interface ScoreEntry {
   seed: number;
   /** which board it counts for; older local entries are time trials */
   mode?: 'race' | 'trial';
+  /** laps in the run (1, 2 or 3); older local entries are 3-lap runs */
+  laps?: number;
+  /** a bot that fills an empty board; never sent to or from the server */
+  bot?: boolean;
   you?: boolean;
   at?: number;
 }
@@ -28,7 +32,6 @@ const KEY = 'turbodrift.scores.v1';
 const NAME_KEY = 'turbodrift.name';
 const CLIENT_KEY = 'turbodrift.client';
 const PENDING_KEY = 'turbodrift.pending.v1';
-const GHOSTS = ['VoltRunner', 'NightDrift', 'PixelRacer', 'ApexKid', 'SynthWolf', 'RubberBurn', 'HaloGT', 'Kira-9', 'TurboToast', 'LaserLine', 'Zenith', 'DriftMonk', 'Hyperion', 'MochiMax'];
 
 export const getPlayerName = (): string => {
   try {
@@ -53,15 +56,33 @@ function loadLocal(): ScoreEntry[] {
   }
 }
 
-/** Deterministic stand-in for a global board so every challenge link has rivals to chase. */
-function mockGlobal(world: number, seed: number): ScoreEntry[] {
+/** Names for the bots that fill an empty board. */
+const BOT_POOL = ['CyberBot-01', 'NeonViper', 'GlitchRider', 'ByteBlaze', 'ChromeFang', 'PulseNova', 'VoltRunner', 'NightDrift', 'PixelRacer', 'ApexKid', 'SynthWolf', 'RubberBurn', 'HaloGT', 'Kira-9', 'TurboToast', 'LaserLine', 'Zenith', 'DriftMonk', 'Hyperion', 'MochiMax'];
+
+/** Rows a board is padded to with bots, so a new track or an empty world still has rivals to chase. */
+export const BOARD_FILL = 15;
+
+/**
+ * Deterministic bot scores for a board (same world, seed, mode and laps always give the same rows), from a quick
+ * lap down to a gentle one. They are marked `bot` so the UI can label them and they never reach the server.
+ * `seed === null` is the world-best board, where each bot "set" its time on a different seed.
+ */
+export function botScores(world: number, seed: number | null, mode: BoardMode, laps: number, count: number): ScoreEntry[] {
   const w = WORLDS[world - 1];
-  const rng = new Rng(hashSeed(world, seed, 7));
-  const base = (w.lapSegments * 200) / (w.maxSpeed * 0.86);
-  return Array.from({ length: 12 }, (_, i) => {
-    const lap = base * (1 + i * 0.035 + rng.range(0, 0.025)) * 1000;
-    return { name: GHOSTS[(i * 5 + rng.int(0, 4)) % GHOSTS.length], lapMs: lap, totalMs: lap * 3 + rng.range(500, 2500), world, seed };
+  const rng = new Rng(hashSeed(world, seed ?? 0, mode === 'race' ? 71 : 7, laps));
+  const par = (w.lapSegments * 200) / (w.maxSpeed * 0.86); // seconds for a tidy lap
+  const pool = [...BOT_POOL];
+  return Array.from({ length: count }, (_, i) => {
+    const lap = par * (1.02 + i * 0.04 + rng.range(0, 0.025)) * 1000;
+    const name = pool.splice(rng.int(0, pool.length - 1), 1)[0] ?? `Bot-${i + 1}`;
+    return { name, lapMs: Math.round(lap), totalMs: Math.round(lap * laps + rng.range(300, 2500)), world, seed: seed ?? 10000 + rng.int(0, 989999), mode, laps, bot: true };
   });
+}
+
+/** Real rows plus however many bots it takes to reach BOARD_FILL, best lap first. */
+export function withBots(rows: ScoreEntry[], world: number, seed: number | null, mode: BoardMode, laps: number): ScoreEntry[] {
+  const filler = botScores(world, seed, mode, laps, Math.max(0, BOARD_FILL - rows.length));
+  return [...rows, ...filler].sort((a, b) => a.lapMs - b.lapMs).slice(0, 25);
 }
 
 const clientId = (): string => {
@@ -189,25 +210,25 @@ export async function saveScore(e: Omit<ScoreEntry, 'you' | 'at'>, replay?: Repl
   await flushPending();
 }
 
-async function fetchGlobal(world: number, seed: number | null, mode: BoardMode): Promise<ScoreEntry[]> {
-  const rows = (await (await api(`/api/leaderboard?world=${world}&mode=${mode}${seed != null ? `&seed=${seed}` : ''}`)).json()) as { name: string; lap_ms: number; total_ms: number; world: number; seed: number }[];
+async function fetchGlobal(world: number, seed: number | null, mode: BoardMode, laps: number): Promise<ScoreEntry[]> {
+  const rows = (await (await api(`/api/leaderboard?world=${world}&mode=${mode}&laps=${laps}${seed != null ? `&seed=${seed}` : ''}`)).json()) as { name: string; lap_ms: number; total_ms: number; world: number; seed: number }[];
   return rows.map((r) => ({ name: r.name, lapMs: r.lap_ms, totalMs: r.total_ms, world: r.world, seed: r.seed }));
 }
 
 /** seed === null → best across every seed in the world. */
-export async function getBoard(world: number, seed: number | null, mode: BoardMode = 'trial'): Promise<Board> {
-  const mine = loadLocal().filter((s) => s.world === world && (s.mode ?? 'trial') === mode && (seed == null || s.seed === seed));
+export async function getBoard(world: number, seed: number | null, mode: BoardMode = 'trial', laps = 3): Promise<Board> {
+  const mine = loadLocal().filter((s) => s.world === world && (s.mode ?? 'trial') === mode && (s.laps ?? 3) === laps && (seed == null || s.seed === seed));
   if (globalEnabled()) {
     try {
       void flushPending();
-      const rows = await fetchGlobal(world, seed, mode);
+      const rows = await fetchGlobal(world, seed, mode, laps);
       // mark my own rows (the public view carries no client id): same name + same lap time as a local score
       for (const r of rows) r.you = mine.some((m) => m.name === r.name && Math.round(m.lapMs) === r.lapMs);
-      return { rows, source: 'global' };
+      return { rows: withBots(rows, world, seed, mode, laps), source: 'global' };
     } catch {
       /* fall through to the offline board */
     }
   }
-  const rows = [...mine, ...mockGlobal(world, seed ?? 0)].sort((a, b) => a.lapMs - b.lapMs).slice(0, 25);
+  const rows = withBots(mine, world, seed, mode, laps);
   return { rows, source: globalEnabled() ? 'offline' : 'local' };
 }

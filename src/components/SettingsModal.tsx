@@ -7,6 +7,7 @@ import { copyText } from '../utils/share';
 import { hapticsEnabled, hapticsSupported, setHaptics } from '../utils/haptics';
 import { getPlayerName, setPlayerName } from '../utils/leaderboard';
 import { resetProgress, type Progress } from '../utils/progress';
+import Segmented from './Segmented';
 import { HUD_MODES, loadSettings, saveSettings, type Settings } from '../utils/settings';
 
 interface Props {
@@ -122,6 +123,25 @@ export default function SettingsModal({ muted, onMute, onProgress, onClose, onTu
                 </button>
               </div>
             </div>
+          </Section>
+
+          <Section title="Race">
+            <Row label="Laps" hint={inRace ? 'Applies to your next race. Each lap count has its own leaderboard' : 'Each lap count has its own leaderboard'}>
+              <Segmented
+                label="Laps per race"
+                value={s.laps}
+                onChange={(n) => update({ laps: n })}
+                options={[
+                  { value: 1, label: '1' },
+                  { value: 2, label: '2' },
+                  { value: 3, label: '3' },
+                ]}
+                className="w-36"
+              />
+            </Row>
+            <Row label="Best-lap ghost" hint="Show your fastest lap as a see-through car in Time Trial">
+              <Toggle on={s.ghost} label="Best-lap ghost" onChange={(v) => update({ ghost: v })} />
+            </Row>
           </Section>
 
           <Section title="Audio">
