@@ -1,28 +1,46 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
 <defs>
-<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FF2D55"/><stop offset=".55" stop-color="#FF375F"/><stop offset="1" stop-color="#FF9F0A"/></linearGradient>
-<radialGradient id="glow" cx=".5" cy=".55" r=".5"><stop offset="0" stop-color="#5AC8FA" stop-opacity=".95"/><stop offset=".55" stop-color="#5AC8FA" stop-opacity=".25"/><stop offset="1" stop-color="#5AC8FA" stop-opacity="0"/></radialGradient>
-<linearGradient id="body" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2E9BFF"/><stop offset="1" stop-color="#0057D9"/></linearGradient>
+<linearGradient id="bg" x1=".1" y1="0" x2=".9" y2="1"><stop offset="0" stop-color="#FF2D55"/><stop offset=".6" stop-color="#FF5A3C"/><stop offset="1" stop-color="#FFB02E"/></linearGradient>
+<radialGradient id="halo" cx=".5" cy=".58" r=".5"><stop offset="0" stop-color="#fff" stop-opacity=".75"/><stop offset=".6" stop-color="#ffd9c8" stop-opacity=".2"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+<radialGradient id="body" cx=".36" cy=".26" r=".85"><stop offset="0" stop-color="#9fd8ff"/><stop offset=".3" stop-color="#2f9bff"/><stop offset=".72" stop-color="#0a56d6"/><stop offset="1" stop-color="#062a86"/></radialGradient>
+<radialGradient id="helmet" cx=".34" cy=".28" r=".8"><stop offset="0" stop-color="#ffffff"/><stop offset=".45" stop-color="#d9ecff"/><stop offset="1" stop-color="#7a98c8"/></radialGradient>
+<linearGradient id="tyreL" x1="0" x2="1"><stop offset="0" stop-color="#5a6180"/><stop offset=".35" stop-color="#232842"/><stop offset="1" stop-color="#0c0f1c"/></linearGradient>
+<linearGradient id="tyreR" x1="1" x2="0"><stop offset="0" stop-color="#5a6180"/><stop offset=".35" stop-color="#232842"/><stop offset="1" stop-color="#0c0f1c"/></linearGradient>
+<radialGradient id="ring" cx=".35" cy=".3" r=".9"><stop offset="0" stop-color="#fff6a8"/><stop offset=".5" stop-color="#ffd60a"/><stop offset="1" stop-color="#d89a00"/></radialGradient>
+<linearGradient id="wing" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#bff0ff"/><stop offset="1" stop-color="#3fb4ff"/></linearGradient>
+<filter id="soft" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="9"/></filter>
 </defs>
-<rect width="512" height="512" rx="112" fill="url(#bg)"/>
-<g stroke="#fff" stroke-linecap="round" opacity=".55"><path d="M70 150h70M96 190h44M372 150h70M372 190h46" stroke-width="12"/></g>
-<circle cx="256" cy="278" r="190" fill="url(#glow)"/>
-<!-- exhaust flames -->
-<path d="M206 392c-10 24-4 46 8 62 6-16 18-30 22-46z M306 392c10 24 4 46-8 62-6-16-18-30-22-46z" fill="#FFD60A"/>
-<path d="M212 394c-4 14-2 28 4 38 4-10 10-20 14-30z M300 394c4 14 2 28-4 38-4-10-10-20-14-30z" fill="#fff"/>
-<!-- wheels -->
-<rect x="104" y="296" width="76" height="112" rx="26" fill="#0A0F1C"/><rect x="332" y="296" width="76" height="112" rx="26" fill="#0A0F1C"/>
-<rect x="116" y="312" width="16" height="80" rx="8" fill="#26324d"/><rect x="380" y="312" width="16" height="80" rx="8" fill="#26324d"/>
-<!-- body -->
-<path d="M160 234h192l46 160c2 8-3 14-11 14H125c-8 0-13-6-11-14z" fill="url(#body)" stroke="#0A0F1C" stroke-width="10" stroke-linejoin="round"/>
-<path d="M196 262h120l22 70H174z" fill="#0A0F1C" opacity=".35"/>
-<!-- tail lights -->
-<rect x="150" y="346" width="64" height="26" rx="13" fill="#FF2D55" stroke="#fff" stroke-width="5"/><rect x="298" y="346" width="64" height="26" rx="13" fill="#FF2D55" stroke="#fff" stroke-width="5"/>
+<rect width="512" height="512"  fill="url(#bg)"/>
+<circle cx="256" cy="300" r="230" fill="url(#halo)"/>
+<g stroke="#fff" stroke-linecap="round" opacity=".5"><path d="M60 170h64M84 206h40M388 170h64M388 206h40" stroke-width="11"/></g>
+<!-- ground shadow -->
+<ellipse cx="256" cy="438" rx="200" ry="30" fill="#5a0a1c" opacity=".38" filter="url(#soft)"/>
+<!-- flames -->
+<path d="M196 392c-12 26-6 50 10 66 6-18 20-32 24-48z M316 392c12 26 6 50-10 66-6-18-20-32-24-48z" fill="#fff2a0"/>
+<path d="M204 394c-5 16-3 30 4 40 5-10 12-20 16-30z M308 394c5 16 3 30-4 40-5-10-12-20-16-30z" fill="#ff9f0a"/>
+<!-- round body -->
+<ellipse cx="256" cy="324" rx="156" ry="108" fill="url(#body)" stroke="#07102e" stroke-width="10"/>
+<ellipse cx="204" cy="272" rx="66" ry="24" transform="rotate(-18 204 272)" fill="#fff" opacity=".4"/>
+<!-- tyres: fat capsules with a lit edge -->
+<rect x="64" y="270" width="96" height="152" rx="46" fill="url(#tyreL)" stroke="#0a0c18" stroke-width="9"/>
+<rect x="352" y="270" width="96" height="152" rx="46" fill="url(#tyreR)" stroke="#0a0c18" stroke-width="9"/>
+<rect x="78" y="296" width="16" height="96" rx="8" fill="#fff" opacity=".22"/>
+<rect x="418" y="296" width="16" height="96" rx="8" fill="#fff" opacity=".22"/>
+<ellipse cx="112" cy="358" rx="17" ry="24" fill="#5ac8fa"/><ellipse cx="400" cy="358" rx="17" ry="24" fill="#5ac8fa"/>
+<!-- engine pod and ring exhausts -->
+<rect x="170" y="356" width="172" height="64" rx="30" fill="#161a30" stroke="#07102e" stroke-width="8"/>
+<circle cx="212" cy="388" r="30" fill="url(#ring)" stroke="#07102e" stroke-width="7"/><circle cx="212" cy="388" r="17" fill="#35b6ff"/><circle cx="212" cy="388" r="9" fill="#e9fbff"/>
+<circle cx="300" cy="388" r="30" fill="url(#ring)" stroke="#07102e" stroke-width="7"/><circle cx="300" cy="388" r="17" fill="#35b6ff"/><circle cx="300" cy="388" r="9" fill="#e9fbff"/>
+<!-- tail lamps -->
+<circle cx="188" cy="326" r="13" fill="#ff2d55" stroke="#fff" stroke-width="5"/><circle cx="324" cy="326" r="13" fill="#ff2d55" stroke="#fff" stroke-width="5"/>
 <!-- rear wing -->
-<rect x="104" y="214" width="304" height="30" rx="15" fill="#5AC8FA" stroke="#0A0F1C" stroke-width="10"/>
-<rect x="128" y="236" width="14" height="40" fill="#0A0F1C"/><rect x="370" y="236" width="14" height="40" fill="#0A0F1C"/>
-<!-- driver -->
-<circle cx="256" cy="190" r="50" fill="#fff" stroke="#0A0F1C" stroke-width="10"/>
-<rect x="214" y="172" width="84" height="26" rx="13" fill="#0A0F1C"/>
-<path d="M232 176h30" stroke="#5AC8FA" stroke-width="6" stroke-linecap="round"/>
+<rect x="112" y="206" width="288" height="36" rx="18" fill="url(#wing)" stroke="#07102e" stroke-width="9"/>
+<rect x="132" y="214" width="248" height="9" rx="4.5" fill="#fff" opacity=".6"/>
+<!-- driver: shoulders, round helmet, mirrored visor -->
+<ellipse cx="256" cy="244" rx="64" ry="30" fill="#0a56d6" stroke="#07102e" stroke-width="8"/>
+<circle cx="256" cy="182" r="72" fill="url(#helmet)" stroke="#07102e" stroke-width="9"/>
+<path d="M190 168c8-30 34-46 66-46s58 16 66 46c-18-14-40-20-66-20s-48 6-66 20z" fill="#2f9bff"/>
+<rect x="198" y="170" width="116" height="40" rx="20" fill="#0d1226"/>
+<rect x="212" y="178" width="60" height="9" rx="4.5" fill="#6fd0ff"/>
+<ellipse cx="226" cy="146" rx="22" ry="12" transform="rotate(-24 226 146)" fill="#fff" opacity=".85"/>
 </svg>

@@ -13,6 +13,8 @@ import type { RaceResult } from './game/types';
 import { flushPending, getPlayerName, saveScore, watchConnectivity } from './utils/leaderboard';
 import { syncCloud } from './utils/cloud';
 import { loadSettings, saveSettings } from './utils/settings';
+import { remindNow, resetInstall, watchInstall } from './utils/install';
+import InstallPrompt from './components/InstallPrompt';
 import { loadProgress, recordFinish, type Progress } from './utils/progress';
 import { randomSeed } from './utils/rng';
 import { markTutorialSeen, TUTORIAL_SEED, TUTORIAL_WORLD, tutorialSeen } from './utils/tutorial';
@@ -55,15 +57,21 @@ export default function App() {
   const [tutorial, setTutorial] = useState(false);
   const [howTo, setHowTo] = useState(false);
   const [offer, setOffer] = useState(false);
+  const [install, setInstall] = useState(false);
 
   useEffect(() => {
     void flushPending();
     void syncCloud().then((p) => p && setProgress(p));
     const stopWatching = watchConnectivity();
+    const stopInstall = watchInstall();
+    // a few seconds after opening in a phone's browser tab, suggest adding it to the home screen
+    const remind = window.setTimeout(() => remindNow() && setInstall(true), 3500);
     const t = window.setInterval(() => setDaily(dailyFor()), 60000); // roll over at UTC midnight
     return () => {
       window.clearInterval(t);
       stopWatching();
+      stopInstall();
+      window.clearTimeout(remind);
     };
   }, []);
 
@@ -231,9 +239,15 @@ export default function App() {
           onTutorial={startTutorial}
           onHowTo={() => setHowTo(true)}
           onPractice={startPractice}
+          onInstall={() => {
+            resetInstall();
+            setSettingsOpen(false);
+            setInstall(true);
+          }}
           inRace={screen !== 'menu'}
         />
       )}
+      {install && screen === 'menu' && !settingsOpen && !board && !howTo && !offer && <InstallPrompt onClose={() => setInstall(false)} />}
       {howTo && <HowToPlayModal onClose={() => setHowTo(false)} onTutorial={screen === 'menu' ? startTutorial : undefined} onPractice={screen === 'menu' ? startPractice : undefined} />}
       {offer && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-5" role="dialog" aria-modal="true" aria-label="First race">
