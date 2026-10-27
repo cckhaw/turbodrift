@@ -22,7 +22,7 @@ A mobile-first arcade kart racer that runs in the browser: pseudo-3D drift racin
 ```bash
 npm install
 npm run dev        # http://localhost:5173 (also reachable from your phone on the same network)
-npm test           # 136 tests
+npm test           # 154 tests
 npm run build      # typecheck + production build
 ```
 
@@ -72,9 +72,9 @@ A guided lap on an easy fixed track (world 1, seed 4242), run in endless Practic
 
 | # | World | Tier | Road | Curves | Lap (≈) | Notes |
 |---|---|---|---|---|---|---|
-| 1 | Neon Megacity | Beginner | wide | gentle (max 3) | 1500 segments, ~40 s | grass slows you, bright cyan city |
-| 2 | Cyber Stratosphere | Intermediate | medium | up to 5 | 1800 segments | sky track, moving wind gates, falls |
-| 3 | Obsidian Core | Expert | narrow | up to 6.5 incl. hairpins | 2000 segments | lava-lit bridges, blocks, falls |
+| 1 | Neon Megacity | Beginner | wide | gentle (max 3) | 1500 segments, ~40 s | grass slows you; night city with shop fronts, crowds, palms and banner arches |
+| 2 | Cyber Stratosphere | Intermediate | medium | up to 5 | 1800 segments | sky track over a cloud sea, balloons, floating islands, light rings, moving wind gates, falls |
+| 3 | Obsidian Core | Expert | narrow | up to 6.5 incl. hairpins | 2000 segments | lava-lit bridges, volcanoes, brazier torches, steel gantries, barrier blocks, falls |
 
 World 1 is open; world 2 unlocks with a podium finish (top 3) in world 1, and world 3 with a podium in world 2. A challenge link or the daily challenge opens its world regardless. Progress, medals and the daily streak are stored on the device and can be synced with [cloud save](#cloud-save).
 
@@ -103,7 +103,17 @@ Waypoint following along a precomputed racing line (`track.ts`), look-ahead lane
 Board modal with a **Race / Time Trial** switch (it opens on the mode you're playing) and two tabs: the current seed, and the best times across the world. Top 25 by best lap (one row per player per track), with your own rows highlighted and an editable name. It shows whether you are looking at the global board, or the offline fallback (your local times plus rival ghosts).
 
 ### UI and presentation
-Apple-style glass interface: frosted panels (`rgba(255,255,255,0.08)` with a 28 px blur), 24 px squircle corners, the SF system font stack, Apple Blue `#007AFF` and neon pink `#FF2D55` on deep obsidian `#090D16`. Safe-area aware and thumb-first. Pseudo-3D road with hills, per-world skylines and parallax, fog, particles, speed lines, spin-outs and screen shake.
+Apple-style glass interface: frosted panels (`rgba(255,255,255,0.08)` with a 28 px blur), 24 px squircle corners, the SF system font stack, Apple Blue `#007AFF` and neon pink `#FF2D55` on deep obsidian `#090D16`. Safe-area aware and thumb-first. Pseudo-3D road with hills, fog, particles, speed lines, spin-outs and screen shake.
+
+### Graphics
+Each world is dressed as a lively, saturated scene rather than a flat backdrop (`src/game/scene.ts`, `scenery.ts`, `gfx.ts`):
+
+- **Neon Megacity**: a dusk sky with a cratered moon, search lights and fireworks, three parallax skyline layers with lit windows and blinking rooftop beacons, a tiled pavement with a glowing kerb, street lamps arching over the road, shop fronts with striped awnings and neon signs, billboards, waving crowds behind barriers, glowing palms, bunting, and banner arches (a START arch with a checkered strip on the line).
+- **Cyber Stratosphere**: a sunrise over a sea of cloud, aurora ribbons, soft puffy cloud banks, floating islands with waterfalls of light, hot-air balloons, wind turbines, crystal lanterns and glowing rings over the road.
+- **Obsidian Core**: smoking volcanoes with lava falls, rising embers, a lava sea with glowing cracks, flame braziers lining the bridge, hazard-striped steel pylons and gantries, rocks veined with lava.
+- **Karts** have outlined glossy bodies, chunky tyres, chrome exhausts, reflective visors and are drawn slightly larger than their hit box so they read on a phone.
+
+Decoration comes from its own seeded random stream, so it never changes a track's layout (pads, boxes, hazards, replays and ghosts are unaffected). The static layers (sky, skylines, clouds, moon, sun) are painted once into offscreen canvases; the rest is drawn per frame. **Battery saver** drops the extra decoration (glows, fireworks, search lights, aurora, embers, window lights), and the game does the same by itself for the rest of the session if frames average slower than about 38 fps for a few seconds.
 
 ### Audio, haptics and PWA
 - **Audio**: everything is synthesised live: engine tone that follows speed, drift hiss, countdown, pickups, hits, lap and finish jingles, and a procedural synthwave loop with a different tempo and scale per world.
@@ -212,7 +222,7 @@ npm test             # vitest run
 npm run typecheck
 ```
 
-136 tests in `tests/` (they also run in CI):
+154 tests in `tests/` (they also run in CI):
 
 | File | Covers |
 |---|---|
@@ -225,6 +235,8 @@ npm run typecheck
 | `minimap`, `lookahead`, `hud`, `settings` | closed non-pinching track maps for every world and seed, bend detection (direction, severity, distance, S-bends, wrap past the finish), map marks and dot spreading, the HUD's racer markers (one *you*, unique positions) and the panel setting |
 | `race-board` | race submissions: the server re-runs a whole race with bots and items and matches the client, separate race / time-trial boards, item-press validation, the database upgrade from the old schema, plausibility floors with item turbos |
 | `touch` | touch steering curve, dead zone and smoothing, arrow pads, the touch settings, and drift assist (starts drifts in bends, boosts, and is recorded so the server reproduces it) |
+| `layout` | golden fingerprints: the road, pads, hazards and item boxes of 12 world+seed tracks never change |
+| `render` | every sprite, backdrop, kart, hazard and prop draws without non-finite numbers or the negative radii that make a browser throw, at every distance, world and variation, in both full and trimmed (lite) modes; the decoration never alters the layout |
 | `ghost`, `daily`, `items`, `format-share`, `cleanup` | ghosts per kart and settings, daily rotation and streaks, item odds and kart stats, scorecard text, deployment selection |
 
 API tests run against an in-memory Postgres ([PGlite](https://pglite.dev)), so no database is needed.

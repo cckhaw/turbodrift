@@ -1,4 +1,24 @@
-export type SceneryKind = 'tower' | 'sign' | 'pylon' | 'cloud' | 'island' | 'rock' | 'lavaPillar' | 'crystal';
+export type SceneryKind =
+  | 'tower'
+  | 'sign'
+  | 'pylon'
+  | 'cloud'
+  | 'island'
+  | 'rock'
+  | 'lavaPillar'
+  | 'crystal'
+  // street furniture and set pieces added in the visual overhaul
+  | 'shop'
+  | 'lamp'
+  | 'crowd'
+  | 'palm'
+  | 'arch'
+  | 'bunting'
+  | 'turbine'
+  | 'balloon'
+  | 'ring'
+  | 'torch'
+  | 'gantry';
 import type { Item } from './items.js';
 import type { Ahead } from './lookahead.js';
 
@@ -9,6 +29,7 @@ export interface Scenery {
   offset: number; // road-halves from center
   size: number; // multiplier
   hue: number; // 0..1 variation
+  label?: string; // text on arches and gantries
 }
 
 export interface Hazard {

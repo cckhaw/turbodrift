@@ -1,0 +1,93 @@
+/** Small painted scenes for the world cards on the menu: a night skyline, a cloud sea at sunrise, a volcanic horizon. */
+const WINDOWS = [3, 11, 19, 27, 35, 43, 51, 59, 67, 75];
+
+function City() {
+  const towers: [number, number, number][] = [
+    [8, 26, 34],
+    [34, 22, 52],
+    [58, 18, 40],
+    [80, 24, 62],
+    [108, 20, 46],
+    [132, 22, 70],
+    [158, 18, 38],
+    [180, 26, 56],
+    [210, 20, 44],
+    [234, 22, 64],
+    [260, 24, 42],
+  ];
+  return (
+    <>
+      <circle cx="238" cy="22" r="13" fill="#ffe3f4" opacity="0.95" />
+      <circle cx="238" cy="22" r="26" fill="#ff8ad8" opacity="0.18" />
+      {towers.map(([x, w, h], i) => (
+        <g key={i}>
+          <rect x={x} y={90 - h} width={w} height={h} fill={i % 2 ? '#1a1c5e' : '#272a80'} />
+          <rect x={x} y={90 - h} width={w} height="1.6" fill={i % 3 ? '#ff5fa2' : '#5ee0ff'} />
+          {WINDOWS.slice(0, Math.floor(h / 9)).map((wy, j) =>
+            [0, 1, 2].map((c) =>
+              (i * 7 + j * 3 + c * 5) % 4 < 2 ? <rect key={`${j}-${c}`} x={x + 4 + c * (w / 3.4)} y={90 - h + wy} width="3" height="3.4" fill={(i + j + c) % 3 ? '#ffe9a8' : '#9be9ff'} opacity="0.8" /> : null,
+            ),
+          )}
+        </g>
+      ))}
+      <rect x="0" y="86" width="300" height="4" fill="#ff5fa2" opacity="0.55" />
+    </>
+  );
+}
+
+function Sky() {
+  return (
+    <>
+      <circle cx="150" cy="84" r="46" fill="#ffb3e6" opacity="0.35" />
+      <path d="M118 90a32 32 0 0 1 64 0z" fill="#fff0c8" />
+      {[
+        [20, 80, 16],
+        [48, 84, 20],
+        [96, 86, 18],
+        [208, 84, 22],
+        [244, 80, 16],
+        [276, 86, 20],
+      ].map(([x, y, r], i) => (
+        <g key={i} fill={i % 2 ? '#ffd9f5' : '#fff0fb'}>
+          <circle cx={x} cy={y} r={r} />
+          <circle cx={x + r * 0.9} cy={y + 3} r={r * 0.75} />
+          <circle cx={x - r * 0.85} cy={y + 4} r={r * 0.65} />
+        </g>
+      ))}
+      <g transform="translate(228 28)">
+        <ellipse cx="0" cy="0" rx="11" ry="13" fill="#ff5fa2" />
+        <ellipse cx="0" cy="0" rx="7" ry="13" fill="#ffd60a" />
+        <ellipse cx="0" cy="0" rx="3" ry="13" fill="#5ee0ff" />
+        <rect x="-3.5" y="17" width="7" height="5" fill="#7a4a2a" />
+      </g>
+      <path d="M40 50l26 0-8 10h-10z" fill="#5a3fb0" />
+      <ellipse cx="53" cy="49" rx="13" ry="3" fill="#7af0c8" />
+      <path d="M53 38l4 10h-8z" fill="#ff8ad8" />
+    </>
+  );
+}
+
+function Volcano() {
+  return (
+    <>
+      <circle cx="150" cy="40" r="30" fill="#ff7a1a" opacity="0.35" />
+      <path d="M70 90L132 28h36l62 62z" fill="#2a0c06" />
+      <path d="M0 90L40 52l30 38z" fill="#1a0705" />
+      <path d="M232 90l30-34 38 34z" fill="#1a0705" />
+      <rect x="132" y="27" width="36" height="3" fill="#ffb347" />
+      <path d="M146 28l8 0 18 62-14 0z" fill="#ff8a2a" opacity="0.9" />
+      {[40, 90, 130, 188, 214, 252].map((x, i) => (
+        <circle key={i} cx={x} cy={20 + ((i * 17) % 40)} r="1.6" fill="#ffd27a" opacity="0.85" />
+      ))}
+      <rect x="0" y="85" width="300" height="5" fill="#ff6a1a" opacity="0.75" />
+    </>
+  );
+}
+
+export default function WorldArt({ world, dim = false }: { world: number; dim?: boolean }) {
+  return (
+    <svg viewBox="0 0 300 90" preserveAspectRatio="xMidYMax slice" aria-hidden="true" className={`pointer-events-none absolute inset-x-0 bottom-0 h-[60px] w-full ${dim ? 'opacity-25 grayscale' : 'opacity-90'}`} style={{ maskImage: 'linear-gradient(to top, black 55%, transparent)', WebkitMaskImage: 'linear-gradient(to top, black 55%, transparent)' }}>
+      {world === 1 ? <City /> : world === 2 ? <Sky /> : <Volcano />}
+    </svg>
+  );
+}
