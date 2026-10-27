@@ -3,7 +3,7 @@ import { clipAbove, glowDot, hazardStripes, mix, rr, type Ctx } from './gfx.js';
 
 export { mix };
 
-export function drawHazard(ctx: Ctx, hz: Hazard, cx: number, base: number, u: number, roadW: number, time: number, clipY: number) {
+export function drawHazard(ctx: Ctx, hz: Hazard, cx: number, base: number, u: number, roadW: number, time: number, clipY: number, day = false) {
   ctx.save();
   clipAbove(ctx, clipY);
   const w = hz.width * roadW * 2 * u;
@@ -39,6 +39,33 @@ export function drawHazard(ctx: Ctx, hz: Hazard, cx: number, base: number, u: nu
       ctx.fillRect(px - w * 0.04, base - h, w * 0.08, h);
       glowDot(ctx, px, base - h, w * 0.3, '#5ac8fa', 0.8);
     }
+  } else if (day) {
+    // a stack of striped traffic barrels with a flashing lamp on top
+    const bw = w / 2.4;
+    const bh = bw * 1.5;
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.beginPath();
+    ctx.ellipse(cx, base, w * 0.6, w * 0.1, 0, 0, Math.PI * 2);
+    ctx.fill();
+    for (const [dx, dy] of [[-1, 0], [1, 0], [0, -0.82]] as const) {
+      const x = cx + dx * bw * 0.52;
+      const y = base + dy * bh;
+      const g = ctx.createLinearGradient(x - bw / 2, 0, x + bw / 2, 0);
+      g.addColorStop(0, '#d9560f');
+      g.addColorStop(0.5, '#ff8a2a');
+      g.addColorStop(1, '#c4480a');
+      ctx.fillStyle = g;
+      rr(ctx, x - bw / 2, y - bh, bw, bh, bw * 0.18);
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(x - bw / 2, y - bh * 0.72, bw, bh * 0.14);
+      ctx.fillRect(x - bw / 2, y - bh * 0.4, bw, bh * 0.14);
+      ctx.fillStyle = 'rgba(0,0,0,0.25)';
+      ctx.fillRect(x - bw / 2, y - bh, bw, Math.max(1, bh * 0.05));
+    }
+    if (Math.floor(time * 3 + hz.phase) % 2 === 0) glowDot(ctx, cx, base - bh * 1.9, w * 0.5, '#ffb347', 0.9);
+    ctx.fillStyle = '#ffd60a';
+    ctx.fillRect(cx - w * 0.05, base - bh * 1.95, w * 0.1, w * 0.08);
   } else {
     // striped concrete barrier with a flashing beacon
     const h = 1500 * u;
@@ -81,16 +108,16 @@ export function drawKart(ctx: Ctx, cx: number, base: number, w: number, color: s
   const shape = fx.shape ?? 'comet';
   const col = color.startsWith('#') ? color : '#888888';
   const acc = accent.startsWith('#') ? accent : '#ffffff';
-  const line = Math.max(1, w * 0.024);
+  const line = Math.max(1, w * 0.026);
   ctx.save();
   clipAbove(ctx, clipY);
   if (fx.blink) ctx.globalAlpha = 0.45;
   // shadow & underglow stay on the road
-  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.fillStyle = 'rgba(0,0,0,0.42)';
   ctx.beginPath();
-  ctx.ellipse(cx, base - w * 0.02, w * 0.58, w * 0.13, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx, base - w * 0.02, w * 0.6, w * 0.14, 0, 0, Math.PI * 2);
   ctx.fill();
-  glowDot(ctx, cx, base - w * 0.05, w * 0.75, acc, 0.5);
+  glowDot(ctx, cx, base - w * 0.05, w * 0.75, acc, 0.4);
 
   const fallScale = 1 - fx.fall * 0.85;
   ctx.translate(cx, base + fx.fall * w * 1.2);
@@ -100,172 +127,177 @@ export function drawKart(ctx: Ctx, cx: number, base: number, w: number, color: s
   ctx.lineWidth = line;
   ctx.strokeStyle = INK;
 
-  // rear tyres: chunky, with tread bands and a bright rim light on the outer edge
-  const ww = w * 0.22;
-  const wh = w * 0.36;
+  // body proportions per kart: all of them are round, some rounder than others
+  const P = shape === 'rocket' ? { rx: 0.31, ry: 0.27, cy: -0.31, tyreX: 0.4, tyreW: 0.2, tyreH: 0.36 } : shape === 'phantom' ? { rx: 0.4, ry: 0.19, cy: -0.24, tyreX: 0.44, tyreW: 0.22, tyreH: 0.32 } : { rx: 0.35, ry: 0.24, cy: -0.29, tyreX: 0.42, tyreW: 0.22, tyreH: 0.36 };
+  const ww = w * P.tyreW;
+  const wh = w * P.tyreH;
+
+  // fat rear tyres: capsules with a glossy edge and a hub
   for (const sd of [-1, 1]) {
-    const x = sd * w * 0.41 - ww / 2;
+    const x = sd * w * P.tyreX - ww / 2;
     const tg = ctx.createLinearGradient(x, 0, x + ww, 0);
-    tg.addColorStop(0, sd < 0 ? '#3a3f55' : '#1a1d2b');
-    tg.addColorStop(0.5, '#171a27');
-    tg.addColorStop(1, sd < 0 ? '#1a1d2b' : '#3a3f55');
+    tg.addColorStop(0, sd < 0 ? '#454b63' : '#1d2030');
+    tg.addColorStop(0.5, '#181b29');
+    tg.addColorStop(1, sd < 0 ? '#1d2030' : '#454b63');
     ctx.fillStyle = tg;
-    rr(ctx, x, -wh, ww, wh, ww * 0.32);
+    rr(ctx, x, -wh, ww, wh, ww * 0.5);
     ctx.fill();
     ctx.stroke();
-    ctx.fillStyle = '#2e3348';
-    for (let t = 1; t < 4; t++) ctx.fillRect(x + ww * 0.12, -wh + (wh * t) / 4 - line * 0.5, ww * 0.76, line);
-    ctx.fillStyle = 'rgba(255,255,255,0.22)';
-    ctx.fillRect(sd < 0 ? x + ww * 0.1 : x + ww * 0.78, -wh * 0.9, ww * 0.1, wh * 0.7);
+    ctx.fillStyle = 'rgba(255,255,255,0.28)';
+    rr(ctx, sd < 0 ? x + ww * 0.12 : x + ww * 0.72, -wh * 0.88, ww * 0.16, wh * 0.62, ww * 0.08);
+    ctx.fill();
+    ctx.fillStyle = acc;
+    ctx.beginPath();
+    ctx.ellipse(x + ww / 2, -wh * 0.42, ww * 0.2, wh * 0.14, 0, 0, Math.PI * 2);
+    ctx.fill();
   }
 
-  // body: glossy gradient, outline, top highlight
-  const g = ctx.createLinearGradient(0, -w * 0.64, 0, -w * 0.08);
-  g.addColorStop(0, mix(col, '#ffffff', 0.35));
-  g.addColorStop(0.35, col);
-  g.addColorStop(1, mix(col, '#000000', 0.5));
+  // round body: a glossy bubble with a lighter belly stripe and a big highlight
+  const g = ctx.createLinearGradient(0, w * (P.cy - P.ry), 0, w * (P.cy + P.ry));
+  g.addColorStop(0, mix(col, '#ffffff', 0.42));
+  g.addColorStop(0.4, col);
+  g.addColorStop(1, mix(col, '#000000', 0.45));
   ctx.fillStyle = g;
-  const pts: [number, number][] =
-    shape === 'rocket'
-      ? [[-0.4, -0.1], [-0.17, -0.62], [0.17, -0.62], [0.4, -0.1]]
-      : shape === 'phantom'
-        ? [[-0.44, -0.1], [-0.3, -0.44], [0.3, -0.44], [0.44, -0.1]]
-        : [[-0.37, -0.1], [-0.28, -0.54], [0.28, -0.54], [0.37, -0.1]];
   ctx.beginPath();
-  pts.forEach(([x, y], i) => (i ? ctx.lineTo(x * w, y * w) : ctx.moveTo(x * w, y * w)));
-  ctx.closePath();
+  ctx.ellipse(0, w * P.cy, w * P.rx, w * P.ry, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
-  // highlight along the shoulder
-  ctx.fillStyle = 'rgba(255,255,255,0.28)';
+  ctx.fillStyle = 'rgba(255,255,255,0.32)';
   ctx.beginPath();
-  ctx.moveTo(pts[1][0] * w + w * 0.02, pts[1][1] * w + w * 0.02);
-  ctx.lineTo(pts[2][0] * w - w * 0.02, pts[2][1] * w + w * 0.02);
-  ctx.lineTo(pts[2][0] * w - w * 0.06, pts[2][1] * w + w * 0.09);
-  ctx.lineTo(pts[1][0] * w + w * 0.06, pts[1][1] * w + w * 0.09);
+  ctx.ellipse(-w * P.rx * 0.38, w * (P.cy - P.ry * 0.5), w * P.rx * 0.34, w * P.ry * 0.2, -0.35, 0, Math.PI * 2);
   ctx.fill();
-  // fender flares over the tyres, in body colour
-  ctx.fillStyle = mix(col, '#000000', 0.18);
+
+  // rounded fenders over the tyres
+  ctx.fillStyle = mix(col, '#000000', 0.12);
   for (const sd of [-1, 1]) {
-    rr(ctx, sd * w * 0.41 - ww * 0.62, -wh * 1.02, ww * 1.24, wh * 0.26, ww * 0.3);
+    ctx.beginPath();
+    ctx.ellipse(sd * w * P.tyreX, -wh * 0.98, ww * 0.82, wh * 0.26, 0, Math.PI, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
   }
+
+  // kart-specific details
   if (shape === 'phantom') {
     ctx.fillStyle = acc;
-    ctx.fillRect(-w * 0.03, -w * 0.44, w * 0.06, w * 0.34); // glowing spine
-    glowDot(ctx, 0, -w * 0.28, w * 0.25, acc, 0.5);
+    rr(ctx, -w * 0.035, w * (P.cy - P.ry * 0.9), w * 0.07, w * P.ry * 1.6, w * 0.035);
+    ctx.fill();
+    glowDot(ctx, 0, w * P.cy, w * 0.26, acc, 0.5);
+    for (const sd of [-1, 1]) {
+      // swept side pods
+      ctx.beginPath();
+      ctx.ellipse(sd * w * 0.5, w * -0.4, w * 0.12, w * 0.07, sd * 0.5, 0, Math.PI * 2);
+      ctx.fillStyle = acc;
+      ctx.fill();
+      ctx.stroke();
+    }
   } else if (shape === 'rocket') {
-    ctx.fillStyle = 'rgba(255,255,255,0.9)';
-    ctx.fillRect(-w * 0.035, -w * 0.6, w * 0.07, w * 0.44); // racing stripe
-    ctx.fillRect(-w * 0.11, -w * 0.6, w * 0.025, w * 0.44);
-    ctx.fillRect(w * 0.085, -w * 0.6, w * 0.025, w * 0.44);
+    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    rr(ctx, -w * 0.04, w * (P.cy - P.ry * 0.95), w * 0.08, w * P.ry * 1.55, w * 0.04);
+    ctx.fill();
+    rr(ctx, -w * 0.13, w * (P.cy - P.ry * 0.85), w * 0.035, w * P.ry * 1.4, w * 0.018);
+    ctx.fill();
+    rr(ctx, w * 0.095, w * (P.cy - P.ry * 0.85), w * 0.035, w * P.ry * 1.4, w * 0.018);
+    ctx.fill();
   } else {
-    ctx.fillStyle = 'rgba(255,255,255,0.85)'; // number roundel
+    ctx.fillStyle = 'rgba(255,255,255,0.9)'; // number roundel
     ctx.beginPath();
-    ctx.arc(0, -w * 0.3, w * 0.07, 0, Math.PI * 2);
+    ctx.arc(0, w * P.cy + w * 0.02, w * 0.075, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = col;
-    ctx.fillRect(-w * 0.012, -w * 0.35, w * 0.024, w * 0.1);
+    ctx.fillRect(-w * 0.013, w * P.cy - w * 0.04, w * 0.026, w * 0.11);
   }
 
-  // engine block with chrome exhausts
-  ctx.fillStyle = '#1b1e2e';
-  rr(ctx, -w * 0.17, -w * 0.2, w * 0.34, w * 0.13, w * 0.04);
+  // engine pod with the two big ring exhausts (bright rings, dark throats)
+  ctx.fillStyle = '#20243a';
+  rr(ctx, -w * 0.2, -w * 0.2, w * 0.4, w * 0.15, w * 0.07);
   ctx.fill();
   ctx.stroke();
   for (const sd of [-1, 1]) {
-    const ex = sd * w * 0.085;
-    const eg = ctx.createRadialGradient(ex - w * 0.01, -w * 0.15, w * 0.005, ex, -w * 0.135, w * 0.055);
-    eg.addColorStop(0, '#ffffff');
-    eg.addColorStop(0.5, '#aab3c9');
-    eg.addColorStop(1, '#3a4054');
-    ctx.fillStyle = eg;
+    const ex = sd * w * 0.105;
+    const ey = -w * 0.125;
+    ctx.fillStyle = '#ffd60a';
     ctx.beginPath();
-    ctx.arc(ex, -w * 0.135, w * 0.05, 0, Math.PI * 2);
+    ctx.arc(ex, ey, w * 0.075, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
-    ctx.fillStyle = fx.boost ? '#5ac8fa' : '#0b0d1a';
+    ctx.fillStyle = fx.boost ? '#5ac8fa' : '#14172a';
     ctx.beginPath();
-    ctx.arc(ex, -w * 0.135, w * 0.028, 0, Math.PI * 2);
+    ctx.arc(ex, ey, w * 0.04, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.beginPath();
+    ctx.arc(ex - w * 0.03, ey - w * 0.035, w * 0.014, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  // driver: shoulders, helmet with a reflective visor
-  const headY = shape === 'rocket' ? -w * 0.7 : shape === 'phantom' ? -w * 0.52 : -w * 0.64;
-  const jersey = shape === 'phantom' ? '#232640' : acc;
-  ctx.fillStyle = jersey;
-  rr(ctx, -w * 0.15, headY + w * 0.05, w * 0.3, w * 0.17, w * 0.07);
+  // driver: round cap in the kart's colour, ears and a rounded jersey, on a round seat back
+  const headY = shape === 'rocket' ? -w * 0.66 : shape === 'phantom' ? -w * 0.5 : -w * 0.62;
+  ctx.fillStyle = mix(acc, '#000000', 0.15);
+  rr(ctx, -w * 0.17, headY + w * 0.04, w * 0.34, w * 0.26, w * 0.12);
   ctx.fill();
   ctx.stroke();
-  const hr = w * 0.145;
-  const hg = ctx.createRadialGradient(-hr * 0.35, headY - hr * 0.4, hr * 0.1, 0, headY, hr * 1.1);
-  const helmet = shape === 'phantom' ? '#2a2d48' : shape === 'rocket' ? '#fff3d6' : '#ffffff';
-  hg.addColorStop(0, '#ffffff');
-  hg.addColorStop(0.55, helmet);
-  hg.addColorStop(1, mix(helmet.startsWith('#') ? helmet : '#ffffff', '#6a7088', 0.55));
+  ctx.fillStyle = acc;
+  rr(ctx, -w * 0.13, headY + w * 0.1, w * 0.26, w * 0.15, w * 0.07);
+  ctx.fill();
+  const hr = w * 0.17;
+  ctx.fillStyle = '#ffd5b0';
+  for (const sd of [-1, 1]) {
+    ctx.beginPath();
+    ctx.arc(sd * hr * 0.95, headY + hr * 0.12, hr * 0.28, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+  const hg = ctx.createRadialGradient(-hr * 0.35, headY - hr * 0.4, hr * 0.1, 0, headY, hr * 1.15);
+  hg.addColorStop(0, mix(shape === 'phantom' ? '#4a4f78' : col, '#ffffff', 0.5));
+  hg.addColorStop(0.6, shape === 'phantom' ? '#2a2d48' : col);
+  hg.addColorStop(1, mix(shape === 'phantom' ? '#2a2d48' : col, '#000000', 0.45));
   ctx.fillStyle = hg;
   ctx.beginPath();
   ctx.arc(0, headY, hr, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
-  // helmet stripe in the kart's accent
-  ctx.fillStyle = acc;
-  ctx.fillRect(-hr * 0.16, headY - hr * 0.98, hr * 0.32, hr * 0.7);
-  // visor
-  const vg = ctx.createLinearGradient(0, headY - hr * 0.2, 0, headY + hr * 0.3);
-  vg.addColorStop(0, shape === 'phantom' ? acc : '#2a3350');
-  vg.addColorStop(1, '#0b0d1a');
-  ctx.fillStyle = vg;
-  rr(ctx, -hr * 0.82, headY - hr * 0.16, hr * 1.64, hr * 0.5, hr * 0.25);
+  // hair under the cap and a round badge on its back
+  ctx.fillStyle = '#3a2418';
+  ctx.beginPath();
+  ctx.ellipse(0, headY + hr * 0.62, hr * 0.78, hr * 0.32, 0, 0, Math.PI);
   ctx.fill();
-  ctx.fillStyle = 'rgba(255,255,255,0.55)';
-  ctx.fillRect(-hr * 0.6, headY - hr * 0.06, hr * 0.7, Math.max(1, hr * 0.07));
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.arc(0, headY - hr * 0.1, hr * 0.34, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = acc;
+  ctx.beginPath();
+  ctx.arc(0, headY - hr * 0.1, hr * 0.2, 0, Math.PI * 2);
+  ctx.fill();
 
-  // wing / fins
+  // round rear wing
   ctx.fillStyle = acc;
   if (shape === 'rocket') {
-    rr(ctx, -w * 0.56, -w * 0.52, w * 1.12, w * 0.07, w * 0.02);
+    rr(ctx, -w * 0.5, -w * 0.5, w * 1.0, w * 0.08, w * 0.04);
     ctx.fill();
     ctx.stroke();
     for (const sd of [-1, 1]) {
-      rr(ctx, sd * w * 0.52 - w * 0.03, -w * 0.64, w * 0.06, w * 0.2, w * 0.015);
+      rr(ctx, sd * w * 0.47 - w * 0.035, -w * 0.62, w * 0.07, w * 0.2, w * 0.035);
       ctx.fill();
       ctx.stroke();
     }
-  } else if (shape === 'phantom') {
-    for (const sd of [-1, 1]) {
-      ctx.beginPath();
-      ctx.moveTo(sd * w * 0.36, -w * 0.4);
-      ctx.lineTo(sd * w * 0.66, -w * 0.66);
-      ctx.lineTo(sd * w * 0.48, -w * 0.2);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-    }
-    rr(ctx, -w * 0.3, -w * 0.45, w * 0.6, w * 0.04, w * 0.015);
-    ctx.fill();
-  } else {
-    rr(ctx, -w * 0.5, -w * 0.58, w * 1.0, w * 0.08, w * 0.025);
+  } else if (shape === 'comet') {
+    rr(ctx, -w * 0.46, -w * 0.52, w * 0.92, w * 0.085, w * 0.042);
     ctx.fill();
     ctx.stroke();
-    for (const sd of [-1, 1]) {
-      rr(ctx, sd * w * 0.4 - w * 0.025, -w * 0.52, w * 0.05, w * 0.12, w * 0.01);
-      ctx.fillStyle = INK;
-      ctx.fill();
-      ctx.fillStyle = acc;
-    }
     ctx.fillStyle = 'rgba(255,255,255,0.45)';
-    ctx.fillRect(-w * 0.46, -w * 0.575, w * 0.92, w * 0.018);
+    rr(ctx, -w * 0.4, -w * 0.5, w * 0.8, w * 0.02, w * 0.01);
+    ctx.fill();
   }
-  // tail lights
+  // tail lights: little round lamps
   ctx.fillStyle = '#ff2d55';
   for (const sd of [-1, 1]) {
-    rr(ctx, sd * w * 0.2 - w * 0.1, -w * 0.33, w * 0.2, w * 0.055, w * 0.025);
+    ctx.beginPath();
+    ctx.arc(sd * w * 0.25, -w * 0.3, w * 0.04, 0, Math.PI * 2);
     ctx.fill();
   }
-  glowDot(ctx, -w * 0.2, -w * 0.3, w * 0.2, '#ff2d55', 0.75, true);
-  glowDot(ctx, w * 0.2, -w * 0.3, w * 0.2, '#ff2d55', 0.75, true);
+  glowDot(ctx, -w * 0.25, -w * 0.3, w * 0.2, '#ff2d55', 0.75, true);
+  glowDot(ctx, w * 0.25, -w * 0.3, w * 0.2, '#ff2d55', 0.75, true);
   if (fx.shield) {
     const sg = ctx.createRadialGradient(0, -w * 0.35, w * 0.2, 0, -w * 0.35, w * 0.85);
     sg.addColorStop(0, 'rgba(90,200,250,0.05)');
@@ -273,23 +305,24 @@ export function drawKart(ctx: Ctx, cx: number, base: number, w: number, color: s
     sg.addColorStop(1, 'rgba(180,240,255,0.85)');
     ctx.fillStyle = sg;
     ctx.beginPath();
-    ctx.ellipse(0, -w * 0.38, w * 0.85, w * 0.75, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, -w * 0.38, w * 0.85, w * 0.78, 0, 0, Math.PI * 2);
     ctx.fill();
   }
-  // exhaust flames
+  // exhaust flames: orange cores with a blue-white heart, from the ring exhausts
   if (fx.boost) {
     const f = 0.8 + fx.flicker * 0.5;
     for (const sd of [-1, 1]) {
-      const ex = sd * w * 0.085;
-      const fg = ctx.createLinearGradient(0, -w * 0.12, 0, w * 0.6 * f);
+      const ex = sd * w * 0.105;
+      const fg = ctx.createLinearGradient(0, -w * 0.12, 0, w * 0.62 * f);
       fg.addColorStop(0, '#ffffff');
-      fg.addColorStop(0.3, '#5ac8fa');
-      fg.addColorStop(1, 'rgba(0,122,255,0)');
+      fg.addColorStop(0.25, '#5ac8fa');
+      fg.addColorStop(0.6, '#ff9f0a');
+      fg.addColorStop(1, 'rgba(255,60,0,0)');
       ctx.fillStyle = fg;
       ctx.beginPath();
-      ctx.moveTo(ex - w * 0.045, -w * 0.12);
-      ctx.lineTo(ex + w * 0.045, -w * 0.12);
-      ctx.lineTo(ex, w * 0.6 * f);
+      ctx.moveTo(ex - w * 0.06, -w * 0.12);
+      ctx.quadraticCurveTo(ex - w * 0.09, w * 0.2 * f, ex, w * 0.62 * f);
+      ctx.quadraticCurveTo(ex + w * 0.09, w * 0.2 * f, ex + w * 0.06, -w * 0.12);
       ctx.fill();
     }
     glowDot(ctx, 0, -w * 0.05, w * 0.45, '#5ac8fa', 0.5);

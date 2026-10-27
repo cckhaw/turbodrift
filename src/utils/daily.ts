@@ -8,12 +8,14 @@ export interface Daily {
 }
 
 const KEY = 'turbodrift.daily.v1';
+/** The daily challenge rotates through this many worlds (every world; a test keeps it in step with WORLDS). */
+export const DAILY_WORLDS = 4;
 const dayKey = (d: Date) => d.toISOString().slice(0, 10);
 
 export function dailyFor(now: Date = new Date()): Daily {
   const date = dayKey(now);
   const dayIndex = Math.floor(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) / 86400000);
-  return { date, world: 1 + (dayIndex % 3), seed: 100000 + (hashSeed(dayIndex, 20251) % 899999) };
+  return { date, world: 1 + (dayIndex % DAILY_WORLDS), seed: 100000 + (hashSeed(dayIndex, 20251) % 899999) };
 }
 
 export const msUntilNextDaily = (now: Date = new Date()): number =>

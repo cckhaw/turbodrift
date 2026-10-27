@@ -1,3 +1,4 @@
+import { WORLDS } from '../game/worlds';
 const KEY = 'turbodrift.progress.v1';
 
 export interface Progress {
@@ -43,7 +44,7 @@ export function resetProgress(): void {
 export function recordFinish(world: number, place: number): Progress {
   const p = loadProgress();
   p.medals[world] = Math.min(p.medals[world] ?? 99, place);
-  if (place <= 3) p.unlocked = Math.max(p.unlocked, Math.min(3, world + 1));
+  if (place <= 3) p.unlocked = Math.max(p.unlocked, Math.min(WORLDS.length, world + 1));
   try {
     localStorage.setItem(KEY, JSON.stringify(p));
   } catch {

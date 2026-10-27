@@ -3,7 +3,7 @@ import type { Result, Sql } from './_core.js';
 import { ensureSchema } from './_core.js';
 
 export interface SaveData {
-  unlocked: number; // highest unlocked world, 1..3
+  unlocked: number; // highest unlocked world, 1..WORLD_COUNT
   medals: Record<string, number>; // world -> best finishing place
   days: string[]; // YYYY-MM-DD daily challenges completed
   name: string;
@@ -13,7 +13,8 @@ export interface SaveData {
 export const CODE_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'; // Crockford base32: no I, L, O, U
 const CODE_RE = /^[0-9ABCDEFGHJKMNPQRSTVWXYZ]{12}$/;
 const KARTS = ['comet', 'rocket', 'phantom'];
-const WORLD_COUNT = 3;
+/** Keep in step with WORLDS in src/game/worlds.ts (a test checks it). */
+export const WORLD_COUNT = 4;
 const CREATE_THROTTLE_SECONDS = 60;
 const bad = (error: string, status = 400): Result => ({ status, body: { error } });
 

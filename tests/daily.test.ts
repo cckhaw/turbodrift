@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { dailyFor, dailyStreak, formatCountdown, msUntilNextDaily } from '../src/utils/daily';
+import { DAILY_WORLDS, dailyFor, dailyStreak, formatCountdown, msUntilNextDaily } from '../src/utils/daily';
+import { WORLDS } from '../src/game/worlds';
 
 const at = (iso: string) => new Date(iso);
 
@@ -18,10 +19,11 @@ describe('daily challenge', () => {
       const d = dailyFor(new Date(Date.UTC(2026, 0, 1 + i)));
       worlds.add(d.world);
       expect(d.world).toBeGreaterThanOrEqual(1);
-      expect(d.world).toBeLessThanOrEqual(3);
+      expect(d.world).toBeLessThanOrEqual(WORLDS.length);
       expect(Number.isInteger(d.seed) && d.seed >= 1 && d.seed <= 999999999).toBe(true);
     }
-    expect(worlds.size).toBe(3); // rotates through every world
+    expect(worlds.size).toBe(WORLDS.length); // rotates through every world
+    expect(DAILY_WORLDS).toBe(WORLDS.length);
   });
 
   it('counts down to the next UTC midnight', () => {

@@ -154,7 +154,8 @@ export class Engine {
     this.player = this.makeCar(0, 'YOU', this.kart.color, this.kart.accent, true);
     this.player.shape = this.kart.id as Car['shape'];
     this.setupGrid(r);
-    this.ghost = this.mode === 'practice' ? null : loadGhost(o.world, o.seed, this.kart.id);
+    // the best-lap ghost belongs to Time Trial: in a race a translucent car restarting at the line every lap just looks like a bug
+    this.ghost = this.mode === 'trial' ? loadGhost(o.world, o.seed, this.kart.id) : null;
     if (this.ghost) this.ghostCar = { ...this.makeCar(99, 'BEST', '#ffffff', '#ffffff', false), ghost: true };
     this.resize();
     if (typeof ResizeObserver !== 'undefined') {
@@ -839,7 +840,7 @@ export class Engine {
     const lap = clamp(Math.floor(p.dist / this.track.length) + 1, 1, LAPS + 1);
     if (lap > this.playerLap && this.state === 'racing') {
       const lapMs = this.lapT * 1000;
-      if (this.rec.d.length > 5 && (!this.ghost || lapMs < this.ghost.lapMs)) {
+      if (this.mode === 'trial' && this.rec.d.length > 5 && (!this.ghost || lapMs < this.ghost.lapMs)) {
         this.ghost = { lapMs, d: this.rec.d, x: this.rec.x };
         saveGhost(this.o.world, this.o.seed, this.kart.id, this.ghost);
         this.ghostCar ??= { ...this.makeCar(99, 'BEST', '#ffffff', '#ffffff', false), ghost: true };
@@ -948,8 +949,9 @@ export class Engine {
     const c = this.ctx;
     c.fillStyle = color;
     c.beginPath();
-    c.moveTo(x1, y1);
-    c.lineTo(x2, y2);
+    // the near edge is pushed down a pixel so neighbouring segments overlap: a bright ground colour (the desert) otherwise shows through as hairlines
+    c.moveTo(x1, y1 + 1);
+    c.lineTo(x2, y2 + 1);
     c.lineTo(x3, y3);
     c.lineTo(x4, y4);
     c.closePath();
@@ -1015,7 +1017,7 @@ export class Engine {
       // ground band, with a faint alternating tint so the speed reads, then the pavement / rails beside the road
       c.fillStyle = groundFill;
       c.fillRect(-20, b.y, W + 40, a.y - b.y + 1);
-      drawRoadside(c, wd, a, b, alt, seg.index, (x1, y1, x2, y2, x3, y3, x4, y4, color) => this.poly(x1, y1, x2, y2, x3, y3, x4, y4, color));
+      drawRoadside(c, wd, a, b, alt, seg.index, (x1, y1, x2, y2, x3, y3, x4, y4, color) => this.poly(x1, y1, x2, y2, x3, y3, x4, y4, color), H / W);
       const rw1 = a.w / 6;
       const rw2 = b.w / 6;
       const lw1 = a.w / 40;
@@ -1035,7 +1037,13 @@ export class Engine {
           const o1 = seg.pad.offset + seg.pad.width;
           this.poly(a.x + a.w * o0, a.y, a.x + a.w * o1, a.y, b.x + b.w * o1, b.y, b.x + b.w * o0, b.y, alt ? '#ffd60a' : '#ff9f0a');
         }
-        if (alt) {
+        if (wd.id === 4) {
+          // highway: a double yellow line down the middle, white dashes between lanes
+          const yw1 = a.w / 90;
+          const yw2 = b.w / 90;
+          for (const o of [-0.05, 0.05]) this.poly(a.x + a.w * o - yw1, a.y, a.x + a.w * o + yw1, a.y, b.x + b.w * o + yw2, b.y, b.x + b.w * o - yw2, b.y, '#f4c430');
+          if (alt) for (const lx of [-0.5, 0.5]) this.poly(a.x + a.w * lx - lw1, a.y, a.x + a.w * lx + lw1, a.y, b.x + b.w * lx + lw2, b.y, b.x + b.w * lx - lw2, b.y, wd.lane);
+        } else if (alt) {
           const lanes = 3;
           for (let l = 1; l < lanes; l++) {
             const lx = -1 + (2 * l) / lanes;
@@ -1075,7 +1083,7 @@ export class Engine {
           const hzd = seg.hazard;
           const off = hzd.base + (hzd.kind === 'wind' ? Math.sin(this.time * hzd.speed + hzd.phase) * hzd.amp : 0);
           const cx = a.x + (a.scale * off * roadW * W) / 2;
-          drawHazard(c, hzd, cx, a.y, u, roadW, this.time, seg.clip);
+          drawHazard(c, hzd, cx, a.y, u, roadW, this.time, seg.clip, wd.id === 4);
         }
         if (seg.boxes && this.mode !== 'trial') {
           for (let k = 0; k < seg.boxes.length; k++) {
@@ -1167,7 +1175,7 @@ export class Engine {
     // vignette
     const g = c.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.4, W / 2, H / 2, Math.max(W, H) * 0.8);
     g.addColorStop(0, 'rgba(0,0,0,0)');
-    g.addColorStop(1, `rgba(0,0,0,${this.fallT > 0 ? 0.7 : 0.4})`);
+    g.addColorStop(1, `rgba(0,0,0,${this.fallT > 0 ? 0.7 : this.wd.id === 4 ? 0.16 : 0.4})`);
     c.fillStyle = g;
     c.fillRect(0, 0, W, H);
     void mix;

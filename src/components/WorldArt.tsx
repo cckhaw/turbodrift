@@ -84,10 +84,42 @@ function Volcano() {
   );
 }
 
+function Desert() {
+  return (
+    <>
+      <circle cx="248" cy="22" r="22" fill="#fff6d0" opacity="0.55" />
+      <circle cx="248" cy="22" r="10" fill="#ffffff" />
+      {[
+        [20, 150, 2.4],
+        [200, 130, 1.8],
+        [60, 120, 1.2],
+      ].map(([x, y, s], i) => (
+        <g key={i} fill="#ffffff" opacity="0.95">
+          <circle cx={x} cy={y / 5} r={7 * s} />
+          <circle cx={x + 8 * s} cy={y / 5 + 2} r={5.5 * s} />
+          <circle cx={x - 7 * s} cy={y / 5 + 3} r={5 * s} />
+        </g>
+      ))}
+      <path d="M0 90L30 50h26l26 40z" fill="#d98f58" />
+      <path d="M90 90L112 38h12l6-8h28l6 8h12l22 52z" fill="#c4703c" />
+      <path d="M210 90l18-34h30l22 34z" fill="#d98f58" />
+      <path d="M96 56h92M118 70h60" stroke="rgba(110,45,25,0.4)" strokeWidth="2" />
+      <rect x="0" y="78" width="300" height="12" fill="#e3a066" />
+      <path d="M0 86h300" stroke="#5a5e66" strokeWidth="6" />
+      <path d="M0 86h300" stroke="#f4c430" strokeWidth="1.2" strokeDasharray="10 8" />
+      <g fill="#3f9a4a">
+        <rect x="262" y="52" width="6" height="28" rx="3" />
+        <rect x="254" y="60" width="4" height="10" rx="2" />
+        <rect x="272" y="56" width="4" height="12" rx="2" />
+      </g>
+    </>
+  );
+}
+
 export default function WorldArt({ world, dim = false }: { world: number; dim?: boolean }) {
   return (
     <svg viewBox="0 0 300 90" preserveAspectRatio="xMidYMax slice" aria-hidden="true" className={`pointer-events-none absolute inset-x-0 bottom-0 h-[60px] w-full ${dim ? 'opacity-25 grayscale' : 'opacity-90'}`} style={{ maskImage: 'linear-gradient(to top, black 55%, transparent)', WebkitMaskImage: 'linear-gradient(to top, black 55%, transparent)' }}>
-      {world === 1 ? <City /> : world === 2 ? <Sky /> : <Volcano />}
+      {world === 1 ? <City /> : world === 2 ? <Sky /> : world === 3 ? <Volcano /> : <Desert />}
     </svg>
   );
 }

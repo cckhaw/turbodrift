@@ -52,6 +52,7 @@ describe('generateTrack', () => {
     expect(count(2, 'hazard')).toBeGreaterThan(5);
     expect(count(3, 'hazard')).toBeGreaterThan(5);
     expect(count(1, 'pad')).toBeGreaterThan(5);
-    expect(WORLDS.map((w) => w.fallOff)).toEqual([false, true, true]);
+    expect(WORLDS.map((w) => w.fallOff)).toEqual([false, true, true, false]);
+    expect(count(4, 'hazard')).toBeGreaterThan(5); // traffic barrels
   });
 });

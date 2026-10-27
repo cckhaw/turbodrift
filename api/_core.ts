@@ -4,7 +4,7 @@
 export type Sql = (strings: TemplateStringsArray, ...values: unknown[]) => Promise<any[]>;
 
 /** Fastest physically plausible lap per world: top speed with permanent boost, minus 10%. */
-export const MIN_LAP_MS: Record<number, number> = { 1: 26000, 2: 30000, 3: 32000 };
+export const MIN_LAP_MS: Record<number, number> = { 1: 26000, 2: 30000, 3: 32000, 4: 28000 };
 const MAX_LAP_MS = 600000;
 const MAX_TOTAL_MS = 3600000;
 const isInt = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v);
@@ -23,7 +23,7 @@ export function ensureSchema(sql: Sql): Promise<void> {
       id          bigint generated always as identity primary key,
       client_id   uuid        not null,
       name        text        not null check (char_length(name) between 1 and 12),
-      world       int         not null check (world between 1 and 3),
+      world       int         not null,
       seed        int         not null check (seed between 1 and 999999999),
       lap_ms      int         not null check (lap_ms between 1000 and 600000),
       total_ms    int         not null check (total_ms between 1000 and 3600000),
@@ -31,6 +31,8 @@ export function ensureSchema(sql: Sql): Promise<void> {
       updated_at  timestamptz not null default now(),
       unique (client_id, world, seed)
     )`;
+    // the world range used to be a column check (1..3); worlds are validated in code now so new ones need no migration
+    await sql`alter table scores drop constraint if exists scores_world_check`;
     // races and time trials rank separately (older rows are all time trials)
     await sql`alter table scores add column if not exists mode text not null default 'trial'`;
     await sql`alter table scores drop constraint if exists scores_client_id_world_seed_key`;

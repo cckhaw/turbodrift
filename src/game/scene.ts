@@ -269,6 +269,117 @@ function volcano(ctx: Ctx, x: number, hz: number, w: number, h: number, body: st
   }
 }
 
+/** One tile of desert rock formations: flat-topped buttes, eroded mushroom mesas and stepped plateaus with strata and a sunlit side. */
+function paintMesas(ctx: Ctx, H: number, hz: number, row: Building[], tile: number, ox: number, body: string, strata: string, shadow: string, hMul: number, seed: number) {
+  for (let i = 0; i < row.length; i++) {
+    const b = row[i];
+    for (const x0 of b.x + b.w > 1 ? [ox + b.x * tile, ox + (b.x - 1) * tile] : [ox + b.x * tile]) {
+      const w = b.w * tile * 1.5;
+      const h = b.h * H * hMul;
+      const top = hz - h;
+      const kind = b.t < 0.34 ? 'butte' : b.t < 0.7 ? 'mushroom' : 'stepped';
+      const g = ctx.createLinearGradient(x0, 0, x0 + w, 0);
+      g.addColorStop(0, shadow);
+      g.addColorStop(0.55, body);
+      g.addColorStop(1, mix(body, '#ffe2b8', 0.28));
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      if (kind === 'butte') {
+        ctx.moveTo(x0, hz + 2);
+        ctx.lineTo(x0 + w * 0.12, top + h * 0.22);
+        ctx.quadraticCurveTo(x0 + w * 0.14, top, x0 + w * 0.26, top);
+        ctx.lineTo(x0 + w * 0.74, top);
+        ctx.quadraticCurveTo(x0 + w * 0.86, top, x0 + w * 0.88, top + h * 0.22);
+        ctx.lineTo(x0 + w, hz + 2);
+      } else if (kind === 'mushroom') {
+        const capH = h * 0.34;
+        ctx.moveTo(x0 + w * 0.24, hz + 2);
+        ctx.lineTo(x0 + w * 0.36, top + capH * 1.1);
+        ctx.quadraticCurveTo(x0 - w * 0.06, top + capH * 1.05, x0, top + capH * 0.6);
+        ctx.quadraticCurveTo(x0 + w * 0.02, top, x0 + w * 0.2, top);
+        ctx.lineTo(x0 + w * 0.8, top);
+        ctx.quadraticCurveTo(x0 + w * 0.98, top, x0 + w, top + capH * 0.6);
+        ctx.quadraticCurveTo(x0 + w * 1.06, top + capH * 1.05, x0 + w * 0.64, top + capH * 1.1);
+        ctx.lineTo(x0 + w * 0.76, hz + 2);
+      } else {
+        ctx.moveTo(x0, hz + 2);
+        ctx.lineTo(x0 + w * 0.06, top + h * 0.5);
+        ctx.lineTo(x0 + w * 0.2, top + h * 0.5);
+        ctx.lineTo(x0 + w * 0.26, top);
+        ctx.lineTo(x0 + w * 0.7, top);
+        ctx.lineTo(x0 + w * 0.76, top + h * 0.34);
+        ctx.lineTo(x0 + w * 0.94, top + h * 0.34);
+        ctx.lineTo(x0 + w, hz + 2);
+      }
+      ctx.closePath();
+      ctx.fill();
+      // strata: thin darker bands across the face
+      ctx.fillStyle = strata;
+      const bands = 3 + Math.floor(hash(seed + i) * 3);
+      for (let k = 1; k <= bands; k++) {
+        const by = top + (h * (k + hash(seed + i * 7 + k) * 0.4)) / (bands + 1);
+        ctx.fillRect(x0 + w * 0.04, by, w * 0.92, Math.max(1, h * 0.018));
+      }
+      // sunlit rim along the top edge
+      ctx.fillStyle = 'rgba(255,236,200,0.55)';
+      ctx.fillRect(x0 + w * 0.26, top, w * 0.48, Math.max(1, h * 0.014));
+    }
+  }
+}
+
+/** Fat daytime cumulus: a cluster of soft white puffs with a blue-grey underside. */
+function paintDayClouds(ctx: Ctx, tile: number, ox: number, puffs: Puff[], hz: number, y0: number, spread: number, size: number, alpha: number) {
+  for (const p of puffs) {
+    const r = size * (0.55 + p.s * 0.55);
+    const y = y0 + p.y * spread;
+    for (const x of [ox + p.x * tile, ox + p.x * tile - tile]) {
+      for (const [dx, dy, k] of [
+        [0, 0, 1],
+        [0.95, 0.18, 0.72],
+        [-0.9, 0.2, 0.68],
+        [0.35, -0.42, 0.62],
+        [-0.3, -0.3, 0.55],
+      ] as const) {
+        const rr2 = r * k;
+        const cx = x + dx * r;
+        const cy = y + dy * r;
+        const g = ctx.createRadialGradient(cx - rr2 * 0.2, cy - rr2 * 0.4, rr2 * 0.1, cx, cy, rr2);
+        g.addColorStop(0, '#ffffff');
+        g.addColorStop(0.65, '#f6faff');
+        g.addColorStop(1, '#bcd3ec');
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(cx, cy, rr2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+  ctx.globalAlpha = 1;
+  void hz;
+}
+
+function helicopter(ctx: Ctx, W: number, hz: number, H: number, t: number) {
+  const s = H * 0.022;
+  const x = ((t * 22) % (W + s * 20)) - s * 8;
+  const y = hz * 0.2 + Math.sin(t * 0.7) * s * 0.4;
+  ctx.fillStyle = '#2b3140';
+  ctx.beginPath();
+  ctx.ellipse(x, y, s * 1.5, s * 0.9, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillRect(x - s * 4, y - s * 0.2, s * 3, s * 0.4); // tail boom
+  ctx.fillRect(x - s * 4.1, y - s * 1.0, s * 0.3, s * 1.1);
+  ctx.fillStyle = '#ffd60a';
+  ctx.fillRect(x - s * 0.9, y - s * 0.55, s * 1.8, s * 0.25);
+  ctx.strokeStyle = `rgba(30,36,48,${0.35 + 0.3 * Math.abs(Math.sin(t * 40))})`; // spinning rotor
+  ctx.lineWidth = Math.max(1, s * 0.12);
+  ctx.beginPath();
+  ctx.moveTo(x - s * 3, y - s * 1.1);
+  ctx.lineTo(x + s * 3, y - s * 1.1);
+  ctx.stroke();
+  ctx.fillRect(x - s * 0.1, y - s * 1.1, s * 0.2, s * 0.35);
+}
+
 // ---------- parallax background ----------
 export function drawBackdrop(ctx: Ctx, W: number, H: number, hz: number, wd: WorldConfig, bd: Backdrop, scroll: number, t: number) {
   const sig = `${W}x${H}x${hz}`;
@@ -287,9 +398,9 @@ export function drawBackdrop(ctx: Ctx, W: number, H: number, hz: number, wd: Wor
   if (skyImg) ctx.drawImage(skyImg, 0, 0);
   else paintSky(ctx);
 
-  // stars (the sky is a night sky in every world)
+  // stars (the first three worlds are night scenes)
   ctx.fillStyle = '#fff';
-  for (const s of bd.stars) {
+  for (const s of wd.id === 4 ? [] : bd.stars) {
     ctx.globalAlpha = (wd.id === 1 ? 0.18 : 0.25) + 0.5 * Math.abs(Math.sin(t * 1.5 + s.x * 40));
     ctx.fillRect(s.x * W, s.y * hz * (wd.id === 1 ? 0.6 : 1), s.r, s.r);
   }
@@ -367,6 +478,31 @@ export function drawBackdrop(ctx: Ctx, W: number, H: number, hz: number, wd: Wor
     const tile = W * 2;
     tiled(ctx, bd, 'cloudsFar', W, H, hz, tile, wrapBase(scroll, 0.1, tile), (c, ox) => paintClouds(c, tile, ox, bd.puffs, hz, hz - H * 0.03, H * 0.06, '#ffd9f5', '#c58ae8', 0.75));
     tiled(ctx, bd, 'cloudsNear', W, H, hz, tile, wrapBase(scroll + 900, 0.22, tile), (c, ox) => paintClouds(c, tile, ox, bd.puffs, hz, hz + H * 0.002, H * 0.07, '#fff0fb', '#e6a8f0', 0.95));
+  } else if (wd.id === 4) {
+    // bright daylight: sun glare, big cumulus, three layers of mesas fading into the haze, a helicopter
+    const sx = W * 0.78 - ((scroll * 0.02) % W);
+    const S = H * 0.8;
+    const sun = sprite(bd, 'sunDay', S, S, sig, (c) => {
+      glowDot(c, S / 2, S / 2, S / 2, '#fff6d0', 0.95);
+      glowDot(c, S / 2, S / 2, S * 0.2, '#ffffff', 1);
+      c.fillStyle = '#ffffff';
+      c.beginPath();
+      c.arc(S / 2, S / 2, H * 0.04, 0, Math.PI * 2);
+      c.fill();
+    });
+    if (sun) for (const off of [0, W]) ctx.drawImage(sun, sx + off - S / 2, hz * 0.22 - S / 2);
+    const ctile = W * 2;
+    tiled(ctx, bd, 'dayCloudsHigh', W, H, hz, ctile, wrapBase(scroll, 0.06, ctile), (c, ox) => paintDayClouds(c, ctile, ox, bd.puffs.filter((_, i) => i % 3 === 0), hz, hz * 0.08, hz * 0.3, H * 0.052, 0.97));
+    const mtile = W * 2.4;
+    for (const [name, row, par, body, strata, shadow, hm, seed] of [
+      ['mesaFar', bd.far, 0.1, '#d7b4a2', 'rgba(190,150,140,0.45)', '#c4a090', 0.85, 7],
+      ['mesaMid', bd.mid, 0.2, '#d98f58', 'rgba(150,70,40,0.4)', '#b86a3e', 0.7, 19],
+      ['mesaNear', bd.near, 0.36, '#c4703c', 'rgba(110,45,25,0.42)', '#9a5230', 0.6, 37],
+    ] as const) {
+      tiled(ctx, bd, name, W, H, hz, mtile, wrapBase(scroll, par, mtile), (c, ox) => paintMesas(c, H, hz, row, mtile, ox, body, strata, shadow, hm, seed));
+    }
+    tiled(ctx, bd, 'dayCloudsLow', W, H, hz, ctile, wrapBase(scroll + 400, 0.14, ctile), (c, ox) => paintDayClouds(c, ctile, ox, bd.puffs.filter((_, i) => i % 4 === 1), hz, hz * 0.58, hz * 0.1, H * 0.03, 0.92));
+    if (!gfxState.lite) helicopter(ctx, W, hz, H, t);
   } else {
     // volcanic horizon: layered ridges, glowing craters, lava falls and rising embers
     const tile = W * 2.4;
@@ -438,6 +574,17 @@ export function drawGround(ctx: Ctx, W: number, H: number, hz: number, wd: World
     ctx.globalCompositeOperation = 'source-over';
     return fill;
   }
+  if (wd.id === 4) {
+    // sun-baked desert: hazy at the horizon, deeper orange nearby
+    const fill = vGrad(ctx, hz, H, [
+      [0, '#f1d3a8'],
+      [0.22, '#e7aa6e'],
+      [1, '#d4864a'],
+    ]);
+    ctx.fillStyle = fill;
+    ctx.fillRect(-20, hz, W + 40, H - hz + 20);
+    return fill;
+  }
   // city: a violet haze at the horizon sinking into the dark blocks below
   const fill = vGrad(ctx, hz, H, [
     [0, mix(wd.fogColor, '#171a52', 0.35)],
@@ -464,9 +611,25 @@ export function drawRoadside(
   alt: number,
   index: number,
   poly: (x1: number, y1: number, x2: number, y2: number, x3: number, y3: number, x4: number, y4: number, color: string) => void,
+  /** screen height / width, since heights are projected with the screen height */
+  hw = 2,
 ) {
   const e1 = a.w * (1 + 1 / 6);
   const e2 = b.w * (1 + 1 / 6);
+  if (wd.id === 4) {
+    // gravel shoulder, then a steel guard rail on posts
+    for (const s of [-1, 1]) {
+      poly(a.x + s * e1, a.y, a.x + s * a.w * 1.42, a.y, b.x + s * b.w * 1.42, b.y, b.x + s * e2, b.y, alt ? '#8a8d93' : '#82858c');
+      const ha = a.w * 0.34 * hw; // rail height in screen px at this distance
+      const hb = b.w * 0.34 * hw;
+      const xa = a.x + s * a.w * 1.46;
+      const xb = b.x + s * b.w * 1.46;
+      if (index % 3 === 0) poly(xa - a.w * 0.012, a.y, xa + a.w * 0.012, a.y, xb + b.w * 0.012, b.y - hb, xb - b.w * 0.012, b.y - hb, '#4d525b'); // post
+      poly(xa, a.y - ha * 0.55, xa, a.y - ha, xb, b.y - hb, xb, b.y - hb * 0.55, '#d9dee5'); // W-beam
+      poly(xa, a.y - ha * 0.55, xa, a.y - ha * 0.2, xb, b.y - hb * 0.2, xb, b.y - hb * 0.55, '#aab1bb');
+    }
+    return;
+  }
   if (wd.id === 1) {
     const tile = Math.floor(index / 3) % 2;
     const color = tile ? '#3f4888' : '#363e78';

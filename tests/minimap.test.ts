@@ -93,7 +93,7 @@ describe('map polish', () => {
   it('marks item-box rows and boost pads once each, inside the lap', async () => {
     const { generateTrack } = await import('../src/game/track');
     const { trackMarks } = await import('../src/game/minimap');
-    for (const world of [1, 2, 3]) {
+    for (const world of [1, 2, 3, 4]) {
       const t = generateTrack(world, 11);
       const marks = trackMarks(t.segments);
       expect(marks.some((m) => m.kind === 'box')).toBe(true);
