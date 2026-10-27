@@ -14,6 +14,14 @@ export const mix = (a: string, b: string, t: number): string => {
   return `rgb(${c(ar, br)},${c(ag, bg)},${c(ab, bb)})`;
 };
 
+/** Like mix(), but returns #rrggbb so the result can be mixed again. */
+export const mixHex = (a: string, b: string, t: number): string => {
+  const [ar, ag, ab] = parse(a);
+  const [br, bg, bb] = parse(b);
+  const c = (x: number, y: number) => Math.max(0, Math.min(255, Math.round(x * (1 - t) + y * t)));
+  return '#' + [c(ar, br), c(ag, bg), c(ab, bb)].map((v) => v.toString(16).padStart(2, '0')).join('');
+};
+
 /** #rrggbb + alpha → rgba() string. */
 export const rgba = (hex: string, a: number): string => {
   const [r, g, b] = parse(hex);
@@ -32,7 +40,23 @@ export function clipAbove(ctx: Ctx, clipY: number) {
 }
 
 /** Set by the engine: true when the device can't keep up (or Battery saver is on), so decoration is trimmed. */
-export const gfxState = { lite: false };
+export const gfxState = {
+  lite: false,
+  /** storm world: how dark it is (0 day .. 1 night) and which way the wind blows (-1..1), for lamps and swaying trees */
+  night: 0,
+  wind: 0,
+  /** at night the lights are queued and drawn after the scene is darkened, so they stay bright */
+  deferGlow: false,
+  glows: [] as { x: number; y: number; r: number; color: string; alpha: number }[],
+};
+
+/** Draw the queued lights on top (after the night tint), then clear the queue. */
+export function flushGlows(ctx: Ctx, boost = 1): void {
+  const q = gfxState.glows;
+  gfxState.deferGlow = false;
+  for (const g of q) glowDot(ctx, g.x, g.y, g.r, g.color, Math.min(1, g.alpha * boost), true);
+  q.length = 0;
+}
 
 const glowSprites = new Map<string, HTMLCanvasElement>();
 const GLOW_PX = 64;
@@ -59,6 +83,10 @@ function glowSprite(color: string): HTMLCanvasElement | null {
 /** Additive radial light, the cheap "bloom" used for lamps, neon and engines. */
 export function glowDot(ctx: Ctx, x: number, y: number, r: number, color: string, alpha = 1, essential = false) {
   if (r < 1.5 || (gfxState.lite && !essential)) return;
+  if (gfxState.deferGlow) {
+    if (gfxState.glows.length < 500) gfxState.glows.push({ x, y, r, color, alpha });
+    return;
+  }
   ctx.globalAlpha = alpha;
   ctx.globalCompositeOperation = 'lighter';
   const sprite = glowSprite(color);

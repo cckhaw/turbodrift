@@ -52,7 +52,8 @@ describe('generateTrack', () => {
     expect(count(2, 'hazard')).toBeGreaterThan(5);
     expect(count(3, 'hazard')).toBeGreaterThan(5);
     expect(count(1, 'pad')).toBeGreaterThan(5);
-    expect(WORLDS.map((w) => w.fallOff)).toEqual([false, true, true, false]);
+    expect(WORLDS.map((w) => w.fallOff)).toEqual([false, true, true, false, true]);
     expect(count(4, 'hazard')).toBeGreaterThan(5); // traffic barrels
+    expect(count(5, 'hazard')).toBeGreaterThan(5); // barriers on the storm pass
   });
 });

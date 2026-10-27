@@ -6,6 +6,7 @@ import { WORLDS } from '../game/worlds';
 import type { Progress } from '../utils/progress';
 import { bestLocalLap } from '../utils/leaderboard';
 import WorldArt from './WorldArt';
+import Segmented from './Segmented';
 import { dailyDone, dailyStreak, formatCountdown, isDaily, msUntilNextDaily, type Daily } from '../utils/daily';
 import { formatTime } from '../utils/format';
 import { randomSeed } from '../utils/rng';
@@ -22,6 +23,8 @@ interface Props {
   muted: boolean;
   mode: Mode;
   onMode: (m: Mode) => void;
+  laps: 1 | 2 | 3;
+  onLaps: (n: 1 | 2 | 3) => void;
   kart: string;
   onKart: (id: string) => void;
   onWorld: (w: number) => void;
@@ -36,12 +39,13 @@ interface Props {
   newPlayer: boolean;
 }
 
-const DIFF_COLOR = ['bg-apple-green/20 text-apple-green', 'bg-apple-yellow/20 text-apple-yellow', 'bg-apple-pink/20 text-apple-pink', 'bg-white/25 text-white'];
+const DIFF_COLOR = ['bg-apple-green/20 text-apple-green', 'bg-apple-yellow/20 text-apple-yellow', 'bg-apple-pink/20 text-apple-pink', 'bg-white/25 text-white', 'bg-red-600/30 text-red-300'];
 const CARD_BG = [
   'linear-gradient(170deg,#1c1f7a,#2b2a8f 40%,#a8327a)',
   'linear-gradient(170deg,#3a1a8c,#8a3fd1 45%,#ff9ad5)',
   'linear-gradient(170deg,#2a0603,#7a1d08 45%,#ff7a2a)',
   'linear-gradient(170deg,#2b86d6,#76c6f4 50%,#e9a566)',
+  'linear-gradient(170deg,#0a1226,#27406b 50%,#6b88b3)',
 ];
 
 export default function Menu(p: Props) {
@@ -76,7 +80,7 @@ export default function Menu(p: Props) {
         <header className="mt-6 animate-rise text-center">
           <p className="text-sm font-semibold uppercase tracking-[0.35em] text-apple-pink">Turbo Drift</p>
           <h1 className="title-grad mt-1 text-5xl font-extrabold leading-none tracking-tight">Neon Circuit</h1>
-          <p className="mt-3 text-[15px] text-white/60">Drift. Boost. Beat five rival bots in 3 laps.</p>
+          <p className="mt-3 text-[15px] text-white/60">Drift. Boost. Beat five rival bots.</p>
         </header>
 
         {p.newPlayer && (
@@ -214,9 +218,25 @@ export default function Menu(p: Props) {
             </button>
           ))}
         </div>
+        {p.mode !== 'practice' && (
+          <div className="mt-3 flex items-center justify-between gap-3 px-1">
+            <span className="text-sm font-medium text-white/70">Laps</span>
+            <Segmented
+              label="Laps"
+              value={p.laps}
+              onChange={p.onLaps}
+              options={[
+                { value: 1, label: '1 lap' },
+                { value: 2, label: '2 laps' },
+                { value: 3, label: '3 laps' },
+              ]}
+              className="w-56"
+            />
+          </div>
+        )}
         <p className="mt-2 px-2 text-center text-xs text-white/50">
-          {p.mode === 'race' && 'Three laps against five bots, with item boxes. Finish top 3 to unlock the next world.'}
-          {p.mode === 'trial' && 'Solo against your ghost. Times are verified and go on the global leaderboard.'}
+          {p.mode === 'race' && `${p.laps === 1 ? 'One lap' : p.laps === 2 ? 'Two laps' : 'Three laps'} against five bots, with item boxes. Finish top 3 to unlock the next world.`}
+          {p.mode === 'trial' && 'Solo, no opponents. Times are verified and go on the global leaderboard for the lap count you pick.'}
           {p.mode === 'practice' && 'Endless free driving with item boxes. No timing, no results. Try the controls and the UI.'}
         </p>
 

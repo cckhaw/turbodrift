@@ -185,6 +185,28 @@ export function drawScenery(ctx: Ctx, s: Scenery, cx: number, base: number, u: n
         ctx.fill();
         break;
       }
+      if (wd.id === 5) {
+        // sodium lamp on a dark pole: it comes on as the light fails and glows in the rain
+        const toward5 = -side;
+        ctx.fillStyle = '#39414f';
+        ctx.fillRect(cx - pw / 2, base - h, pw, h);
+        const ex5 = cx + toward5 * 900 * k * u;
+        const ey5 = base - h - 70 * k * u;
+        ctx.strokeStyle = '#39414f';
+        ctx.lineWidth = Math.max(1.2, pw * 0.8);
+        ctx.beginPath();
+        ctx.moveTo(cx, base - h);
+        ctx.quadraticCurveTo(cx, ey5 - 200 * k * u, ex5, ey5);
+        ctx.stroke();
+        const lit = Math.min(1, gfxState.night * 1.2 + 0.15);
+        ctx.fillStyle = '#5a6272';
+        rr(ctx, ex5 - 300 * k * u, ey5 - 40 * k * u, 600 * k * u, 140 * k * u, 60 * k * u);
+        ctx.fill();
+        // the lit lens and its halo are queued as lights, so the night tint doesn't dim them
+        glow(ex5, ey5 + 60 * k * u, 380 * k * u, '#fff3d0', lit);
+        glow(ex5, ey5 + 70 * k * u, 1800 * k * u, '#ffc766', 0.7 * lit);
+        break;
+      }
       if (wd.id === 4) {
         // grey highway lamp with a long arm reaching over the lanes
         const toward4 = -side;
@@ -321,7 +343,7 @@ export function drawScenery(ctx: Ctx, s: Scenery, cx: number, base: number, u: n
       break;
     }
     case 'pylon': {
-      if (wd.id === 3) {
+      if (wd.id === 3 || wd.id === 5) {
         // steel pylon with a hazard-striped foot and a warning beacon
         const w = 420 * k * u;
         const h = 4200 * k * u;
@@ -530,11 +552,12 @@ export function drawScenery(ctx: Ctx, s: Scenery, cx: number, base: number, u: n
     case 'rock': {
       const w = 1700 * k * u;
       const h = (1600 + 1600 * s.hue) * k * u;
-      glow(cx, base, w * 0.9, '#ff6a1a', 0.35);
+      const storm = wd.id === 5;
+      if (!storm) glow(cx, base, w * 0.9, '#ff6a1a', 0.35);
       const g = ctx.createLinearGradient(cx - w / 2, 0, cx + w / 2, 0);
-      g.addColorStop(0, '#3b2a2a');
-      g.addColorStop(0.5, '#1d1414');
-      g.addColorStop(1, '#0c0707');
+      g.addColorStop(0, storm ? '#5b6a7f' : '#3b2a2a');
+      g.addColorStop(0.5, storm ? '#364254' : '#1d1414');
+      g.addColorStop(1, storm ? '#1c2533' : '#0c0707');
       ctx.fillStyle = g;
       ctx.beginPath();
       ctx.moveTo(cx - w / 2, base);
@@ -551,7 +574,7 @@ export function drawScenery(ctx: Ctx, s: Scenery, cx: number, base: number, u: n
       ctx.lineTo(cx - w * 0.34, base - h * 0.62);
       ctx.lineTo(cx - w * 0.05, base - h * 0.4);
       ctx.fill();
-      ctx.strokeStyle = '#ff8a2a';
+      ctx.strokeStyle = storm ? 'rgba(235,242,255,0.7)' : '#ff8a2a';
       ctx.lineWidth = Math.max(1, w * 0.018);
       ctx.beginPath();
       ctx.moveTo(cx - w * 0.1, base - h);
@@ -759,6 +782,93 @@ export function drawScenery(ctx: Ctx, s: Scenery, cx: number, base: number, u: n
       }
       break;
     }
+    case 'pine': {
+      const h = 3600 * k * u;
+      const w = 1500 * k * u;
+      if (w < 3) break;
+      const sway = gfxState.wind * w * 0.05 * (1 + Math.sin(time * 2 + s.hue * 20) * 0.5);
+      ctx.fillStyle = '#2b2218';
+      ctx.fillRect(cx - w * 0.04, base - h * 0.18, w * 0.08, h * 0.18);
+      // three tiers of needles, darker at night and under snow on the upper ones
+      for (let i = 0; i < 3; i++) {
+        const y1 = base - h * (0.12 + i * 0.26);
+        const y0 = y1 - h * 0.42;
+        const ww = w * (0.5 - i * 0.1);
+        const sx = sway * (i + 1) * 0.4;
+        const g = ctx.createLinearGradient(cx - ww, 0, cx + ww, 0);
+        g.addColorStop(0, '#16382c');
+        g.addColorStop(0.6, '#1f4d3a');
+        g.addColorStop(1, '#2d6a4f');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.moveTo(cx - ww, y1);
+        ctx.lineTo(cx + sx, y0);
+        ctx.lineTo(cx + ww, y1);
+        ctx.fill();
+        if (i > 0) {
+          ctx.fillStyle = 'rgba(240,247,255,0.85)';
+          ctx.beginPath();
+          ctx.moveTo(cx + sx - ww * 0.32, y0 + (y1 - y0) * 0.38);
+          ctx.lineTo(cx + sx, y0);
+          ctx.lineTo(cx + sx + ww * 0.32, y0 + (y1 - y0) * 0.38);
+          ctx.lineTo(cx + sx, y0 + (y1 - y0) * 0.3);
+          ctx.fill();
+        }
+      }
+      break;
+    }
+    case 'lighthouse': {
+      const h = 5200 * k * u;
+      const w = 760 * k * u;
+      if (w < 3) break;
+      const night = gfxState.night;
+      // slim tower with red bands, a lamp room and a gallery
+      ctx.fillStyle = '#eef2f8';
+      ctx.beginPath();
+      ctx.moveTo(cx - w * 0.5, base);
+      ctx.lineTo(cx - w * 0.3, base - h * 0.78);
+      ctx.lineTo(cx + w * 0.3, base - h * 0.78);
+      ctx.lineTo(cx + w * 0.5, base);
+      ctx.fill();
+      ctx.fillStyle = '#d83a3a';
+      for (const [a, b] of [[0.14, 0.3], [0.46, 0.62]] as const) {
+        ctx.beginPath();
+        ctx.moveTo(cx - w * (0.5 - 0.2 * a), base - h * 0.78 * a);
+        ctx.lineTo(cx + w * (0.5 - 0.2 * a), base - h * 0.78 * a);
+        ctx.lineTo(cx + w * (0.5 - 0.2 * b), base - h * 0.78 * b);
+        ctx.lineTo(cx - w * (0.5 - 0.2 * b), base - h * 0.78 * b);
+        ctx.fill();
+      }
+      ctx.fillStyle = '#2a2f3a';
+      ctx.fillRect(cx - w * 0.45, base - h * 0.8, w * 0.9, h * 0.03);
+      ctx.fillStyle = night > 0.3 ? '#fff6c4' : '#9ec6e8';
+      ctx.fillRect(cx - w * 0.22, base - h * 0.9, w * 0.44, h * 0.1);
+      ctx.fillStyle = '#d83a3a';
+      ctx.beginPath();
+      ctx.moveTo(cx - w * 0.3, base - h * 0.9);
+      ctx.lineTo(cx, base - h * 0.99);
+      ctx.lineTo(cx + w * 0.3, base - h * 0.9);
+      ctx.fill();
+      if (night > 0.2) {
+        // a rotating beam sweeping across the scene
+        const a = time * 1.4 + s.hue * 6;
+        const len = Math.cos(a);
+        glow(cx, base - h * 0.85, 2600 * k * u, '#fff3b0', 0.75 * night);
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        const bg = ctx.createLinearGradient(cx, 0, cx + len * w * 14, 0);
+        bg.addColorStop(0, `rgba(255,244,190,${0.5 * night * Math.abs(len)})`);
+        bg.addColorStop(1, 'rgba(255,244,190,0)');
+        ctx.fillStyle = bg;
+        ctx.beginPath();
+        ctx.moveTo(cx, base - h * 0.86);
+        ctx.lineTo(cx + len * w * 14, base - h * 0.86 - w * 2.4);
+        ctx.lineTo(cx + len * w * 14, base - h * 0.86 + w * 2.4);
+        ctx.fill();
+        ctx.restore();
+      }
+      break;
+    }
     case 'arch':
     case 'bunting':
     case 'ring':
@@ -780,7 +890,7 @@ function drawSpan(ctx: Ctx, s: Scenery, cx: number, base: number, u: number, vu:
   if (half < 6) return;
   const k = s.size;
   const day = wd.id === 4;
-  const accent = day ? '#ffffff' : wd.id === 1 ? (s.hue > 0.5 ? '#ff5fa2' : '#5ee0ff') : wd.id === 2 ? '#ff8ad8' : '#ff8a2a';
+  const accent = day ? '#ffffff' : wd.id === 5 ? '#ffc400' : wd.id === 1 ? (s.hue > 0.5 ? '#ff5fa2' : '#5ee0ff') : wd.id === 2 ? '#ff8ad8' : '#ff8a2a';
 
   if (s.kind === 'ring') {
     const cy = base - 2300 * vu;
@@ -844,7 +954,7 @@ function drawSpan(ctx: Ctx, s: Scenery, cx: number, base: number, u: number, vu:
   }
 
   // arch / gantry: two posts, a beam and a lit sign
-  const steel = s.kind === 'gantry' || wd.id === 3;
+  const steel = s.kind === 'gantry' || wd.id === 3 || wd.id === 5;
   const postCol = day ? '#8f96a1' : steel ? '#4a4552' : wd.id === 2 ? '#6a3fb8' : '#2f3a8c';
   const beamH = (steel ? 620 : 900) * k * vu;
   const top = base - postH;

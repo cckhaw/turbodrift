@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GHOST_DT, ghostAt, loadGhost, saveGhost, type Ghost } from '../src/utils/ghost';
 import { loadSettings, saveSettings, sanitize, DEFAULT_SETTINGS } from '../src/utils/settings';
 import { loadEngine, recordRace, recordTrial } from './helpers/headless';
+import { WORLDS } from '../src/game/worlds';
 import type { HudSnapshot } from '../src/game/types';
 import { FIXED_DT } from '../src/game/replay';
 
@@ -41,8 +42,10 @@ describe('ghosts are per kart', () => {
 
 describe('the best-lap ghost is a Time Trial feature', () => {
   /** Run a mode for a few seconds with a saved ghost present and report whether a ghost marker ever shows up. */
-  async function ghostShown(mode: 'race' | 'trial'): Promise<boolean> {
+  async function ghostShown(mode: 'race' | 'trial', enabled = true): Promise<boolean> {
     saveGhost(1, 5, 'comet', ghost(30000));
+    if (enabled) store.set('turbodrift.settings.v1', JSON.stringify({ ghost: true }));
+    else store.delete('turbodrift.settings.v1');
     const E = await loadEngine();
     const noop = new Proxy(function () {}, { get: () => noop, apply: () => noop }) as unknown as CanvasRenderingContext2D;
     const canvas = { getContext: () => noop, clientWidth: 390, clientHeight: 844, width: 0, height: 0 } as unknown as HTMLCanvasElement;
@@ -57,10 +60,32 @@ describe('the best-lap ghost is a Time Trial feature', () => {
     return seen;
   }
 
-  it('shows a ghost in Time Trial but not in a race, where it would look like a car restarting at the line', async () => {
-    expect(await ghostShown('trial')).toBe(true);
-    expect(await ghostShown('race')).toBe(false);
+  it('shows a ghost in Time Trial only when the player turned it on, and never in a race', async () => {
+    expect(await ghostShown('trial', true)).toBe(true);
+    expect(await ghostShown('race', true)).toBe(false);
+    expect(await ghostShown('trial', false)).toBe(false); // the default: a lone translucent car reads as an opponent
   });
+
+  it.each(WORLDS.map((w) => w.id))('world %i: a Time Trial shows exactly one car on every lap, even with a saved best-lap ghost', async (world) => {
+    saveGhost(world, 9, 'comet', ghost(30000));
+    const E = await loadEngine();
+    const noop = new Proxy(function () {}, { get: () => noop, apply: () => noop }) as unknown as CanvasRenderingContext2D;
+    const canvas = { getContext: () => noop, clientWidth: 390, clientHeight: 844, width: 0, height: 0 } as unknown as HTMLCanvasElement;
+    const seen: number[] = [];
+    let ghosts = 0;
+    let lapsSeen = new Set<number>();
+    let done = false;
+    const e = new E({ canvas, world, seed: 9, mode: 'trial', kart: 'comet', onHud: (h) => (seen.push(h.total), (ghosts += h.racers.filter((r) => r.ghost || !r.you).length), lapsSeen.add(h.lap)), onFinish: () => (done = true) });
+    const p = e as unknown as { update(dt: number): void; state: string; track: { line: number[] }; seg(d: number): { index: number }; player: { dist: number; x: number } };
+    for (let i = 0; !done && i < 60 * 900; i++) {
+      e.input.steer = Math.max(-1, Math.min(1, p.state === 'countdown' ? 0 : (p.track.line[p.seg(p.player.dist + 1200).index] - p.player.x) * 3));
+      p.update(FIXED_DT);
+    }
+    expect(done).toBe(true);
+    expect([...lapsSeen]).toEqual(expect.arrayContaining([1, 2, 3]));
+    expect(new Set(seen)).toEqual(new Set([1]));
+    expect(ghosts).toBe(0);
+  }, 120000);
 
   it('a race does not record ghosts either', async () => {
     await recordRace(1, 11, 'comet');

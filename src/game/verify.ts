@@ -1,13 +1,13 @@
 import { Engine } from './engine.js';
 import { KARTS } from './karts.js';
 import { MAX_REPLAY_ITEMS, MAX_REPLAY_STEPS, decodeRuns } from './replay.js';
-import { LAPS, WORLDS } from './worlds.js';
+import { DEFAULT_LAPS, LAP_OPTIONS, WORLDS } from './worlds.js';
 
 /**
  * Server-side replay verification. Re-runs the real game engine headlessly with the recorded inputs and
  * reports the times the *simulation* produced, so the client's claimed time is never trusted.
  */
-export type Verified = { ok: true; world: number; seed: number; kart: string; mode: 'trial' | 'race'; lapMs: number; totalMs: number; lapTimes: number[] } | { ok: false; error: string };
+export type Verified = { ok: true; world: number; seed: number; kart: string; mode: 'trial' | 'race'; laps: number; lapMs: number; totalMs: number; lapTimes: number[] } | { ok: false; error: string };
 
 const noop: unknown = new Proxy(function () {}, { get: () => noop, apply: () => noop });
 
@@ -22,6 +22,8 @@ export function verifyReplay(input: unknown): Verified {
   if (typeof kart !== 'string' || !KARTS.some((k) => k.id === kart)) return { ok: false, error: 'unknown kart' };
   if (!isInt(steps) || steps < 60 || steps > MAX_REPLAY_STEPS) return { ok: false, error: 'bad replay length' };
   if (typeof data !== 'string' || data.length > 300_000) return { ok: false, error: 'bad replay data' };
+  const laps = r.laps === undefined ? DEFAULT_LAPS : r.laps;
+  if (!isInt(laps) || !(LAP_OPTIONS as readonly number[]).includes(laps)) return { ok: false, error: 'unsupported lap count' };
   const mode = r.mode === undefined ? 'trial' : r.mode;
   if (mode !== 'trial' && mode !== 'race') return { ok: false, error: 'unknown mode' };
   const items = r.items === undefined ? [] : r.items;
@@ -36,8 +38,8 @@ export function verifyReplay(input: unknown): Verified {
   if (runs.reduce((n, x) => n + x.steps, 0) !== steps) return { ok: false, error: 'replay length mismatch' };
 
   const canvas = { getContext: () => noop, clientWidth: 390, clientHeight: 844, width: 0, height: 0 } as unknown as HTMLCanvasElement;
-  const engine = new Engine({ canvas, world, seed, mode, kart, onHud: () => {}, onFinish: () => {} });
+  const engine = new Engine({ canvas, world, seed, mode, kart, laps, onHud: () => {}, onFinish: () => {} });
   const result = engine.runReplay(runs, steps + 120, items as number[]);
-  if (!result || result.lapTimes.length !== LAPS) return { ok: false, error: 'replay does not finish the race' };
-  return { ok: true, world, seed, kart, mode, lapMs: Math.round(result.bestLap), totalMs: Math.round(result.totalTime), lapTimes: result.lapTimes.map(Math.round) };
+  if (!result || result.lapTimes.length !== laps) return { ok: false, error: 'replay does not finish the race' };
+  return { ok: true, world, seed, kart, mode, laps, lapMs: Math.round(result.bestLap), totalMs: Math.round(result.totalTime), lapTimes: result.lapTimes.map(Math.round) };
 }

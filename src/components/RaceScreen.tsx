@@ -20,6 +20,8 @@ interface Props {
   seed: number;
   mode: Mode;
   kart: string;
+  /** laps for a race or time trial (1, 2 or 3) */
+  laps?: number;
   onFinish: (r: RaceResult) => void;
   onQuit: () => void;
   onSettings: () => void;
@@ -29,7 +31,7 @@ interface Props {
 
 const LVL_COLOR = ['#ffffff', '#5AC8FA', '#FF2D55'];
 
-export default function RaceScreen({ world, seed, mode, kart, onFinish, onQuit, onSettings, tutorial = false }: Props) {
+export default function RaceScreen({ world, seed, mode, kart, laps = 3, onFinish, onQuit, onSettings, tutorial = false }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<Engine | null>(null);
   const finishRef = useRef(onFinish);
@@ -61,7 +63,7 @@ export default function RaceScreen({ world, seed, mode, kart, onFinish, onQuit, 
   const w = WORLDS[world - 1];
 
   useEffect(() => {
-    const engine = new Engine({ canvas: canvasRef.current!, world, seed, onHud: setHud, onFinish: (r) => finishRef.current(r), mode, kart });
+    const engine = new Engine({ canvas: canvasRef.current!, world, seed, onHud: setHud, onFinish: (r) => finishRef.current(r), mode, kart, laps });
     engineRef.current = engine;
     engine.start();
     // touch steering is eased towards the thumb's position every frame (the keyboard writes straight through)
@@ -117,7 +119,7 @@ export default function RaceScreen({ world, seed, mode, kart, onFinish, onQuit, 
       engine.destroy();
       engineRef.current = null;
     };
-  }, [world, seed, mode, kart]);
+  }, [world, seed, mode, kart, laps]);
 
   useEffect(() => {
     engineRef.current?.setPaused(paused);
@@ -197,6 +199,15 @@ export default function RaceScreen({ world, seed, mode, kart, onFinish, onQuit, 
             <Flag size={10} /> {mode === 'practice' ? 'Lap time' : `Lap ${hud?.lap ?? 1}/${hud?.laps ?? 3}`}
           </p>
           <p className="font-mono text-lg font-semibold tabular-nums">{formatTime(hud?.lapTime ?? 0)}</p>
+          {hud?.weather && (
+            <p className="mt-0.5 flex items-center justify-center gap-2 text-[11px] font-semibold text-white/75" aria-label="Weather">
+              <span>{hud.weather.day > 0.55 ? '☀️' : hud.weather.day > 0.25 ? '🌆' : '🌙'}</span>
+              <span className={hud.weather.rain > 0.5 ? 'text-sky-300' : ''}>🌧 {Math.round(hud.weather.rain * 100)}%</span>
+              <span className={Math.abs(hud.weather.wind) > 0.6 ? 'font-extrabold text-apple-yellow' : ''}>
+                💨 {hud.weather.wind < -0.08 ? '⬅' : hud.weather.wind > 0.08 ? '➜' : '·'}
+              </span>
+            </p>
+          )}
         </div>
         <button aria-label="Pause" onClick={() => setPaused(true)} className="glass pointer-events-auto z-30 flex h-12 w-12 items-center justify-center !rounded-2xl active:scale-95">
           <Pause size={20} />

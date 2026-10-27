@@ -153,10 +153,15 @@ function decorate(segs: Segment[], worldId: number, seed: number) {
       if (art.chance(0.012)) add(i, { kind: 'truck', offset: art.sign() * art.range(2.0, 2.8), size: art.range(0.9, 1.15), hue: art.next() });
     }
   }
+  if (worldId === 5) {
+    for (let i = 0; i < N; i++) {
+      if (art.chance(0.022)) add(i, { kind: 'turbine', offset: art.sign() * art.range(2.4, 3.6), size: art.range(1, 1.5), hue: art.next() });
+    }
+  }
   // set pieces over the road: a START arch on the line, then something every few hundred segments
   add(4, { kind: 'arch', offset: 0, size: 1, hue: 0.2, label: 'START' });
   const span = worldId === 1 ? (['arch', 'bunting'] as const) : worldId === 2 ? (['ring', 'ring'] as const) : worldId === 4 ? (['arch', 'arch'] as const) : (['gantry', 'gantry'] as const);
-  const labels = worldId === 1 ? ['TURBO DRIFT', 'NEON CITY', 'DRIFT KING', 'GO GO GO'] : worldId === 3 ? ['OBSIDIAN CORE', 'MAGMA RUN', 'KEEP COOL'] : worldId === 4 ? ['MESA 12 MI', 'FUEL · FOOD', 'NEXT EXIT', 'SUNBAKED MESA'] : [''];
+  const labels = worldId === 1 ? ['TURBO DRIFT', 'NEON CITY', 'DRIFT KING', 'GO GO GO'] : worldId === 3 ? ['OBSIDIAN CORE', 'MAGMA RUN', 'KEEP COOL'] : worldId === 4 ? ['MESA 12 MI', 'FUEL · FOOD', 'NEXT EXIT', 'SUNBAKED MESA'] : worldId === 5 ? ['TEMPEST PEAK', 'STORM WARNING', 'GUSTS AHEAD', 'WET ROAD'] : [''];
   let n = 0;
   for (let i = art.int(160, 240); i < N - 80; i += art.int(220, 340)) {
     const kind = span[n % span.length];

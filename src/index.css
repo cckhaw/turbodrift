@@ -40,3 +40,10 @@ input { -webkit-user-select: text; user-select: text; }
     color: transparent;
   }
 }
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

@@ -7,6 +7,8 @@ import { copyText } from '../utils/share';
 import { hapticsEnabled, hapticsSupported, setHaptics } from '../utils/haptics';
 import { getPlayerName, setPlayerName } from '../utils/leaderboard';
 import { resetProgress, type Progress } from '../utils/progress';
+import Segmented from './Segmented';
+import { currentPlatform, isStandalone } from '../utils/install';
 import { HUD_MODES, loadSettings, saveSettings, type Settings } from '../utils/settings';
 
 interface Props {
@@ -17,6 +19,8 @@ interface Props {
   onTutorial: () => void;
   onHowTo: () => void;
   onPractice: () => void;
+  /** show the add-to-home-screen sheet again (only offered on phones, in a browser tab, from the menu) */
+  onInstall?: () => void;
   /** a race is in progress, so starting a lesson would abandon it */
   inRace: boolean;
 }
@@ -52,7 +56,7 @@ const Section = ({ title, children }: { title: string; children: React.ReactNode
   </section>
 );
 
-export default function SettingsModal({ muted, onMute, onProgress, onClose, onTutorial, onHowTo, onPractice, inRace }: Props) {
+export default function SettingsModal({ muted, onMute, onProgress, onClose, onTutorial, onHowTo, onPractice, onInstall, inRace }: Props) {
   const [s, setS] = useState<Settings>(loadSettings);
   const [name, setName] = useState(getPlayerName());
   const [haptics, setHapticsState] = useState(hapticsEnabled());
@@ -120,8 +124,32 @@ export default function SettingsModal({ muted, onMute, onProgress, onClose, onTu
                 <button disabled={inRace} onClick={onPractice} className="btn-glass !px-3 !py-2.5 text-sm disabled:opacity-40">
                   Practice mode
                 </button>
+                {onInstall && currentPlatform() !== 'other' && !isStandalone() && (
+                  <button disabled={inRace} onClick={onInstall} className="btn-glass col-span-2 !py-2.5 text-sm disabled:opacity-40">
+                    Add to home screen
+                  </button>
+                )}
               </div>
             </div>
+          </Section>
+
+          <Section title="Race">
+            <Row label="Laps" hint={inRace ? 'Applies to your next race. Each lap count has its own leaderboard' : 'Each lap count has its own leaderboard'}>
+              <Segmented
+                label="Laps per race"
+                value={s.laps}
+                onChange={(n) => update({ laps: n })}
+                options={[
+                  { value: 1, label: '1' },
+                  { value: 2, label: '2' },
+                  { value: 3, label: '3' },
+                ]}
+                className="w-36"
+              />
+            </Row>
+            <Row label="Best-lap ghost" hint="Show your fastest lap as a see-through car in Time Trial">
+              <Toggle on={s.ghost} label="Best-lap ghost" onChange={(v) => update({ ghost: v })} />
+            </Row>
           </Section>
 
           <Section title="Audio">

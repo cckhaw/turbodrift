@@ -4,14 +4,15 @@ import { Rng, hashSeed } from '../utils/rng.js';
 import { haptic } from '../utils/haptics.js';
 import { loadSettings, type Settings } from '../utils/settings.js';
 import { GHOST_DT, ghostAt, loadGhost, saveGhost, type Ghost } from '../utils/ghost.js';
-import { BOT_COLORS, BOT_NAMES, LAPS, SEG_LENGTH, WORLDS } from './worlds.js';
+import { BOT_COLORS, BOT_NAMES, DEFAULT_LAPS, SEG_LENGTH, WORLDS } from './worlds.js';
 import { generateTrack } from './track.js';
 import { lookAhead } from './lookahead.js';
 import { KARTS, kartById, type KartSpec } from './karts.js';
 import { BOX_OFFSETS, BOX_RESPAWN, OIL_LIFE, SHIELD_TIME, SPIN_TIME, rollItem } from './items.js';
 import { drawHazard, drawItemBox, drawKart, drawProp, lerp, mix } from './draw.js';
 import { gfxState } from './gfx.js';
-import { drawBackdrop, drawGround, drawRoadside, makeBackdrop, type Backdrop } from './scene.js';
+import { WIND_PUSH, rainCentrifugal, rainSteering, weatherAt, type Weather } from './weather.js';
+import { drawBackdrop, drawGround, drawRoadside, drawStormGround, drawWeatherFx, makeBackdrop, stormSky, type Backdrop } from './scene.js';
 import { drawScenery } from './scenery.js';
 import type { Car, HudSnapshot, RaceResult, Segment, Track, WorldConfig } from './types.js';
 
@@ -57,6 +58,8 @@ export interface EngineOptions {
   /** race: bots + items · trial: solo, verified for the leaderboard · practice: solo, items, endless, nothing recorded */
   mode?: 'race' | 'trial' | 'practice';
   kart?: string;
+  /** laps in a race or time trial (1, 2 or 3; default 3). Practice is endless. */
+  laps?: number;
 }
 
 export class Engine {
@@ -83,6 +86,10 @@ export class Engine {
   private bgScroll = 0;
   /** trimmed decoration: Battery saver, or switched on automatically when frames run slow */
   private lite = false;
+  /** the storm world's weather at the current simulation time (null in the other worlds) */
+  private wx: Weather | null = null;
+  private gustCd = 0;
+  private wasLightning = false;
   private slowFrames = 0;
   private frameSum = 0;
   private frameCount = 0;
@@ -133,6 +140,7 @@ export class Engine {
   private settings: Settings;
   private kart: KartSpec;
   private mode: 'race' | 'trial' | 'practice';
+  private laps: number;
   private countdownLen = COUNTDOWN;
   private itemRng: Rng;
   private itemRollT = 0;
@@ -148,6 +156,7 @@ export class Engine {
     this.backdrop = makeBackdrop(() => r.next());
     this.settings = loadSettings();
     this.mode = o.mode ?? 'race';
+    this.laps = o.laps === 1 || o.laps === 2 ? o.laps : DEFAULT_LAPS;
     if (this.mode === 'practice') this.countdownLen = 0.6; // no countdown, just GO
     this.kart = kartById(o.kart ?? KARTS[0].id);
     this.itemRng = new Rng(hashSeed(o.world, o.seed, 555));
@@ -156,7 +165,8 @@ export class Engine {
     this.setupGrid(r);
     // the best-lap ghost belongs to Time Trial: in a race a translucent car restarting at the line every lap just looks like a bug
     this.ghost = this.mode === 'trial' ? loadGhost(o.world, o.seed, this.kart.id) : null;
-    if (this.ghost) this.ghostCar = { ...this.makeCar(99, 'BEST', '#ffffff', '#ffffff', false), ghost: true };
+    // ...and even there the car is only drawn if the player asks for it: a lone translucent car reads as an opponent
+    if (this.ghost && this.settings.ghost) this.ghostCar = { ...this.makeCar(99, 'BEST', '#ffffff', '#ffffff', false), ghost: true };
     this.resize();
     if (typeof ResizeObserver !== 'undefined') {
       this.resizeObs = new ResizeObserver(() => this.resize());
@@ -242,6 +252,9 @@ export class Engine {
 
   destroy(): void {
     gfxState.lite = false;
+    gfxState.deferGlow = false;
+    gfxState.glows.length = 0;
+    gfxState.night = gfxState.wind = 0;
     if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(this.raf);
     this.resizeObs?.disconnect();
     synth.stopEngine();
@@ -308,6 +321,7 @@ export class Engine {
   private update(dt: number) {
     this.readCommand(dt);
     this.time += dt;
+    this.wx = this.wd.weather ? weatherAt(this.time) : null;
     if (this.toastT > 0 && (this.toastT -= dt) <= 0) this.toast = null;
 
     if (this.state === 'countdown') {
@@ -346,7 +360,23 @@ export class Engine {
       }
     }
     synth.updateEngine(this.player.speed / this.wd.maxSpeed, this.drifting, this.boostT > 0, this.fallT > 0);
+    this.weatherCues(dt);
     this.pushHud(dt);
+  }
+
+  /** Warn about a rising gust and rumble thunder with the lightning; keep the rain and wind sound in step. */
+  private weatherCues(dt: number): void {
+    const wx = this.wx;
+    if (!wx) return;
+    synth.setWeather(wx.rain, wx.gust * Math.abs(wx.wind));
+    this.gustCd = Math.max(0, this.gustCd - dt);
+    if (this.state === 'racing' && this.gustCd <= 0 && Math.abs(wx.wind) > 0.6) {
+      this.say(wx.wind > 0 ? 'GUST ➜' : '⬅ GUST');
+      this.gustCd = 5;
+    }
+    const flash = wx.lightning > 0.5;
+    if (flash && !this.wasLightning) synth.thunder();
+    this.wasLightning = flash;
   }
 
   private stepPlayer(dt: number, frozen: boolean) {
@@ -400,6 +430,10 @@ export class Engine {
     let steerEff = steer;
     let cent = wd.centrifugal;
     let turnRate = 2 * this.kart.handling;
+    if (this.wx) {
+      cent *= rainCentrifugal(this.wx.rain);
+      turnRate *= rainSteering(this.wx.rain);
+    }
     if (this.drifting) {
       this.driftCharge += dt * (0.8 + 0.4 * Math.abs(steer)) * this.kart.drift;
       const lvl: 0 | 1 | 2 = this.driftCharge > 2.1 ? 2 : this.driftCharge > 0.9 ? 1 : 0;
@@ -429,6 +463,8 @@ export class Engine {
     const dx = dt * turnRate * clamp(pct, 0, 1.2);
     p.x += dx * steerEff;
     p.x -= dx * pct * seg.curve * cent;
+    // gusts shove the kart sideways, harder the faster it goes
+    if (this.wx && this.state === 'racing' && !spun) p.x += this.wx.wind * WIND_PUSH * dt * clamp(pct, 0, 1);
     p.x = clamp(p.x, -2.2, 2.2);
     p.dist += p.speed * dt;
     this.bgScroll += seg.curve * pct * dt * 140;
@@ -439,7 +475,7 @@ export class Engine {
       this.drifting = false;
       this.driftCharge = 0;
       this.driftLvl = 0;
-      this.say(wd.id === 3 ? 'Burned! 🔥' : 'Fell off the sky track!');
+      this.say(wd.id === 3 ? 'Burned! 🔥' : wd.id === 5 ? 'Swept off the pass! 💨' : 'Fell off the sky track!');
       synth.fall();
       haptic.fall();
     }
@@ -594,6 +630,7 @@ export class Engine {
   getReplay(): Replay | null {
     if (this.mode === 'practice' || !this.recorder.valid || !this.finalResult || this.replayRuns) return null;
     const r: Replay = { v: 1, world: this.o.world, seed: this.o.seed, kart: this.kart.id, steps: this.recorder.total, data: encodeRuns(this.recorder.runs) };
+    if (this.laps !== DEFAULT_LAPS) r.laps = this.laps;
     if (this.mode === 'race') {
       r.mode = 'race';
       r.items = this.recorder.items;
@@ -748,7 +785,7 @@ export class Engine {
     const wd = this.wd;
     const N = this.track.segments.length;
     const playerDist = this.player.dist;
-    const finalLap = this.player.lap >= LAPS;
+    const finalLap = this.player.lap >= this.laps;
     for (const b of this.cars) {
       if (b.isPlayer) continue;
       if (frozen) {
@@ -785,11 +822,12 @@ export class Engine {
       else b.speed = Math.max(targetSpeed, b.speed - wd.maxSpeed * 0.5 * dt);
       const lat = 1.7 * clamp(b.speed / wd.maxSpeed, 0.2, 1) * dt;
       b.x += clamp(target - b.x, -lat, lat);
+      if (this.wx) b.x = clamp(b.x + this.wx.wind * WIND_PUSH * 0.45 * dt * clamp(b.speed / wd.maxSpeed, 0, 1), -1.2, 1.2);
       const prev = b.dist;
       b.dist += b.speed * dt;
       this.collectBoxes(b, prev);
-      b.lap = clamp(Math.floor(b.dist / this.track.length) + 1, 1, LAPS + 1);
-      if (b.finishTime == null && b.dist >= LAPS * this.track.length) b.finishTime = this.raceT * 1000;
+      b.lap = clamp(Math.floor(b.dist / this.track.length) + 1, 1, this.laps + 1);
+      if (b.finishTime == null && b.dist >= this.laps * this.track.length) b.finishTime = this.raceT * 1000;
     }
   }
 
@@ -837,13 +875,13 @@ export class Engine {
       p.lap = n;
       return;
     }
-    const lap = clamp(Math.floor(p.dist / this.track.length) + 1, 1, LAPS + 1);
+    const lap = clamp(Math.floor(p.dist / this.track.length) + 1, 1, this.laps + 1);
     if (lap > this.playerLap && this.state === 'racing') {
       const lapMs = this.lapT * 1000;
       if (this.mode === 'trial' && this.rec.d.length > 5 && (!this.ghost || lapMs < this.ghost.lapMs)) {
         this.ghost = { lapMs, d: this.rec.d, x: this.rec.x };
         saveGhost(this.o.world, this.o.seed, this.kart.id, this.ghost);
-        this.ghostCar ??= { ...this.makeCar(99, 'BEST', '#ffffff', '#ffffff', false), ghost: true };
+        if (this.settings.ghost) this.ghostCar ??= { ...this.makeCar(99, 'BEST', '#ffffff', '#ffffff', false), ghost: true };
         this.say('NEW BEST LAP');
       }
       this.rec = { lapMs: 0, d: [], x: [] };
@@ -852,7 +890,7 @@ export class Engine {
       this.lapPositions.push(this.rank().indexOf(p) + 1);
       this.lapT = 0;
       this.playerLap = lap;
-      if (lap > LAPS) {
+      if (lap > this.laps) {
         p.finishTime = this.raceT * 1000;
         this.state = 'finished';
         this.drifting = false;
@@ -864,18 +902,19 @@ export class Engine {
       } else {
         synth.lap();
         haptic.lap();
-        this.say(lap === LAPS ? 'FINAL LAP' : `LAP ${lap}`);
+        this.say(lap === this.laps ? 'FINAL LAP' : `LAP ${lap}`);
       }
     }
-    p.lap = Math.min(lap, LAPS);
+    p.lap = Math.min(lap, this.laps);
   }
 
   private buildResult(): RaceResult {
     const ranked = this.rank();
     const p = this.player;
-    const remaining = (c: Car) => Math.max(0, LAPS * this.track.length - c.dist) / Math.max(c.speed, this.wd.maxSpeed * 0.5);
+    const remaining = (c: Car) => Math.max(0, this.laps * this.track.length - c.dist) / Math.max(c.speed, this.wd.maxSpeed * 0.5);
     return {
       mode: this.mode === 'trial' ? 'trial' : 'race', // practice never produces a result
+      laps: this.laps,
       kart: this.kart.id,
       world: this.o.world,
       seed: this.o.seed,
@@ -904,8 +943,8 @@ export class Engine {
     this.o.onHud({
       position: Math.max(1, ranked.indexOf(p) + 1),
       total: this.cars.length,
-      lap: Math.min(p.lap, LAPS),
-      laps: LAPS,
+      lap: Math.min(p.lap, this.laps),
+      laps: this.laps,
       kmh: Math.round((p.speed / this.wd.maxSpeed) * 240),
       lapTime: this.lapT * 1000,
       raceTime: Math.max(0, this.raceT) * 1000,
@@ -919,6 +958,7 @@ export class Engine {
       item: p.item,
       itemRolling: this.itemRollT > 0,
       shield: p.shieldT > 0,
+      weather: this.wx ? { day: this.wx.day, rain: this.wx.rain, wind: this.wx.wind, gust: this.wx.gust } : null,
       racers: this.racerMarkers(ranked),
       ahead: lookAhead(this.track.segments, this.seg(p.dist).index, this.wd.curveMax),
     });
@@ -970,8 +1010,13 @@ export class Engine {
     if (this.shake > 0 && this.settings.shake) c.translate((Math.random() - 0.5) * this.shake * 10, (Math.random() - 0.5) * this.shake * 8);
 
     gfxState.lite = this.lite || this.settings.quality === 'low';
-    drawBackdrop(c, W, H, hz, wd, this.backdrop, this.bgScroll, this.time);
-    const groundFill = drawGround(c, W, H, hz, wd, this.time);
+    const wx = wd.weather ? (this.wx ?? weatherAt(this.time)) : null;
+    gfxState.night = wx ? 1 - wx.day : 0;
+    gfxState.wind = wx ? wx.wind : 0;
+    gfxState.deferGlow = !!wx; // in the storm world lights are stamped on after the night tint
+    const fogColor = wx ? stormSky(wx).fog : wd.fogColor;
+    drawBackdrop(c, W, H, hz, wd, this.backdrop, this.bgScroll, this.time, wx ?? undefined);
+    const groundFill = wx ? drawStormGround(c, W, H, hz, wx, this.time) : drawGround(c, W, H, hz, wd, this.time);
 
     const camPos = mod(p.dist - PLAYER_Z, track.length);
     const base = segs[Math.floor(camPos / SEG_LENGTH)];
@@ -1059,7 +1104,7 @@ export class Engine {
 
       if (seg.fog > 0.01) {
         c.globalAlpha = seg.fog;
-        c.fillStyle = wd.fogColor;
+        c.fillStyle = fogColor;
         c.fillRect(-20, b.y, W + 40, a.y - b.y + 1);
         c.globalAlpha = 1;
       }
@@ -1122,6 +1167,7 @@ export class Engine {
     for (const s of drawn) this.seg(s.dist).cars.length = 0;
     for (const sg of propSegs) sg.props.length = 0;
     // fog layer must not tint sprites; just clear the cars lists above
+    if (wx) drawWeatherFx(c, W, H, hz, wx, this.time, clamp(this.player.speed / wd.maxSpeed, 0, 1.2));
     this.drawOverlay();
     c.restore();
   }

@@ -1,7 +1,9 @@
 import type { WorldConfig } from './types.js';
 
 export const SEG_LENGTH = 200;
-export const LAPS = 3;
+/** Laps in a race when the player hasn't chosen (they can pick 1, 2 or 3). */
+export const DEFAULT_LAPS = 3;
+export const LAP_OPTIONS = [1, 2, 3] as const;
 
 export const WORLDS: WorldConfig[] = [
   {
@@ -131,6 +133,39 @@ export const WORLDS: WorldConfig[] = [
     windGates: false,
     blocks: true,
     music: { bpm: 118, root: 98, scale: [0, 2, 4, 7, 9, 12] },
+  },
+  {
+    id: 5,
+    name: 'Tempest Peak',
+    emoji: '⛈️',
+    tagline: 'Day turns to night. Wind and rain.',
+    difficulty: 'God',
+    blurb: 'A knife-edge mountain pass in a living storm. The sun sets as the rain closes in, gusts shove you at the edge and the barriers never stop. Only for the very best.',
+    roadWidth: 1850,
+    lapSegments: 2200,
+    curveMax: 6.5,
+    hairpins: true,
+    hill: [10, 20],
+    maxSpeed: 8300,
+    centrifugal: 0.25,
+    fallOff: true,
+    offroadLimit: 0.2,
+    botPace: 1.05,
+    rubberSlow: 0.12,
+    rubberFast: 0.24,
+    sky: ['#0b1220', '#2a3f66', '#8fb3d9'],
+    grass: ['#16202e', '#1b2736'],
+    road: ['#2a2f3a', '#313745'],
+    rumble: ['#ffd60a', '#1c1c1c'],
+    lane: '#e8eefc',
+    fogColor: '#6f8fb3',
+    glow: '#9ad0ff',
+    scenery: ['pine', 'rock', 'pylon', 'lighthouse'],
+    sceneryDensity: 0.2,
+    windGates: false,
+    blocks: true,
+    weather: true,
+    music: { bpm: 150, root: 73.4, scale: [0, 2, 3, 7, 8, 12] },
   },
 ];
 

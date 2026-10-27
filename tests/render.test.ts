@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { drawHazard, drawItemBox, drawKart, drawProp } from '../src/game/draw';
-import { drawBackdrop, drawGround, drawRoadside, makeBackdrop } from '../src/game/scene';
+import { drawBackdrop, drawGround, drawRoadside, drawStormGround, drawWeatherFx, makeBackdrop } from '../src/game/scene';
+import { weatherAt } from '../src/game/weather';
 import { drawScenery } from '../src/game/scenery';
 import { gfxState } from '../src/game/gfx';
 import { generateTrack } from '../src/game/track';
@@ -39,7 +40,7 @@ function recorder() {
   return { ctx, problems };
 }
 
-const ALL: SceneryKind[] = ['tower', 'sign', 'pylon', 'cloud', 'island', 'rock', 'lavaPillar', 'crystal', 'shop', 'lamp', 'crowd', 'palm', 'arch', 'bunting', 'turbine', 'balloon', 'ring', 'torch', 'gantry', 'cactus', 'butte', 'roadsign', 'shrub', 'flag', 'truck'];
+const ALL: SceneryKind[] = ['tower', 'sign', 'pylon', 'cloud', 'island', 'rock', 'lavaPillar', 'crystal', 'shop', 'lamp', 'crowd', 'palm', 'arch', 'bunting', 'turbine', 'balloon', 'ring', 'torch', 'gantry', 'cactus', 'butte', 'roadsign', 'shrub', 'flag', 'truck', 'pine', 'lighthouse'];
 
 describe('the recorder', () => {
   it('flags the mistakes a real canvas would choke on', () => {
@@ -120,13 +121,43 @@ describe('scene drawing', () => {
   });
 });
 
+describe('storm world drawing', () => {
+  it('draws cleanly at every time of day, in every kind of weather, in full and lite modes', () => {
+    const wd = WORLDS.find((w) => w.id === 5)!;
+    for (const lite of [false, true]) {
+      gfxState.lite = lite;
+      const { ctx, problems } = recorder();
+      const bd = makeBackdrop(() => new Rng(5).next());
+      for (const [W, H] of [[780, 1688], [1280, 720]]) {
+        const hz = Math.round(H * 0.37);
+        for (let t = 0; t < 400; t += 3.7) {
+          const wx = weatherAt(t);
+          gfxState.night = 1 - wx.day;
+          gfxState.wind = wx.wind;
+          gfxState.deferGlow = true;
+          drawBackdrop(ctx, W, H, hz, wd, bd, t * 90, t, wx);
+          drawStormGround(ctx, W, H, hz, wx, t);
+          drawScenery(ctx, { kind: 'lamp', offset: 1.3, size: 1, hue: 0.4 }, 200, 600, 0.05, wd, 0, t, W, H);
+          drawScenery(ctx, { kind: 'lighthouse', offset: 2, size: 1, hue: 0.4 }, 300, 600, 0.03, wd, 0, t, W, H);
+          drawWeatherFx(ctx, W, H, hz, wx, t, (t % 10) / 8);
+        }
+      }
+      gfxState.deferGlow = false;
+      gfxState.night = gfxState.wind = 0;
+      expect(problems.slice(0, 5)).toEqual([]);
+    }
+    gfxState.lite = false;
+  });
+});
+
 describe('track dressing', () => {
   it('adds street furniture and set pieces without touching the gameplay layout', () => {
-    for (const w of [1, 2, 3, 4]) {
+    for (const w of [1, 2, 3, 4, 5]) {
       const t = generateTrack(w, 4242);
       const kinds = new Set(t.segments.flatMap((s) => s.scenery.map((x) => x.kind)));
       expect(kinds.has(w === 3 ? 'torch' : 'lamp')).toBe(true);
       expect(kinds.has(w === 1 || w === 4 ? 'arch' : w === 2 ? 'ring' : 'gantry')).toBe(true);
+      if (w === 5) expect(kinds.has('turbine')).toBe(true);
       if (w === 4) expect(kinds.has('flag') && kinds.has('truck')).toBe(true);
       expect(t.segments[4].scenery.some((x) => x.kind === 'arch' && x.label === 'START')).toBe(true);
       // the same seed gives identical dressing
