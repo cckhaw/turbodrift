@@ -154,7 +154,8 @@ export class Engine {
     this.player = this.makeCar(0, 'YOU', this.kart.color, this.kart.accent, true);
     this.player.shape = this.kart.id as Car['shape'];
     this.setupGrid(r);
-    this.ghost = this.mode === 'practice' ? null : loadGhost(o.world, o.seed, this.kart.id);
+    // the best-lap ghost belongs to Time Trial: in a race a translucent car restarting at the line every lap just looks like a bug
+    this.ghost = this.mode === 'trial' ? loadGhost(o.world, o.seed, this.kart.id) : null;
     if (this.ghost) this.ghostCar = { ...this.makeCar(99, 'BEST', '#ffffff', '#ffffff', false), ghost: true };
     this.resize();
     if (typeof ResizeObserver !== 'undefined') {
@@ -839,7 +840,7 @@ export class Engine {
     const lap = clamp(Math.floor(p.dist / this.track.length) + 1, 1, LAPS + 1);
     if (lap > this.playerLap && this.state === 'racing') {
       const lapMs = this.lapT * 1000;
-      if (this.rec.d.length > 5 && (!this.ghost || lapMs < this.ghost.lapMs)) {
+      if (this.mode === 'trial' && this.rec.d.length > 5 && (!this.ghost || lapMs < this.ghost.lapMs)) {
         this.ghost = { lapMs, d: this.rec.d, x: this.rec.x };
         saveGhost(this.o.world, this.o.seed, this.kart.id, this.ghost);
         this.ghostCar ??= { ...this.makeCar(99, 'BEST', '#ffffff', '#ffffff', false), ghost: true };

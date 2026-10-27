@@ -52,8 +52,8 @@ export default function LeaderboardModal({ world, seed, last, mode, onClose }: P
   const best = rows.findIndex((r) => r.you);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/55 p-3 sm:items-center" onClick={onClose} role="dialog" aria-modal="true" aria-label="Leaderboard">
-      <div className="glass animate-rise flex max-h-[88vh] w-full max-w-md flex-col overflow-hidden !bg-[rgba(20,26,42,0.85)]" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/55 p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-[max(0.5rem,env(safe-area-inset-top))] sm:items-center sm:p-4" onClick={onClose} role="dialog" aria-modal="true" aria-label="Leaderboard">
+      <div className="glass animate-rise flex h-full w-full max-w-md flex-col overflow-hidden !bg-[rgba(20,26,42,0.92)] sm:h-[min(820px,90vh)] sm:max-w-lg" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 pb-2 pt-4">
           <div>
             <h2 className="text-xl font-bold tracking-tight">Leaderboard</h2>
@@ -82,9 +82,9 @@ export default function LeaderboardModal({ world, seed, last, mode, onClose }: P
           ))}
         </div>
 
-        <ol className="mt-3 flex-1 space-y-1 overflow-y-auto px-3">
+        <ol className="mt-3 min-h-0 flex-1 space-y-1 overflow-y-auto px-3">
           {rows.map((r, i) => (
-            <li key={i} className={`flex items-center gap-3 rounded-2xl px-3 py-2.5 ${r.you ? 'bg-apple-blue/25 ring-1 ring-apple-blue/60' : 'bg-white/[0.04]'}`}>
+            <li key={i} className={`flex items-center gap-3 rounded-2xl px-3 py-2 ${r.you ? 'bg-apple-blue/25 ring-1 ring-apple-blue/60' : 'bg-white/[0.04]'}`}>
               <span className={`w-6 text-center text-sm font-bold ${i < 3 ? 'text-apple-yellow' : 'text-white/40'}`}>{i + 1}</span>
               <span className="flex-1 truncate font-medium">{r.you ? `${r.name} ★` : r.name}</span>
               {tab === 'world' && <span className="font-mono text-[11px] text-white/35">#{r.seed}</span>}

@@ -22,7 +22,7 @@ A mobile-first arcade kart racer that runs in the browser: pseudo-3D drift racin
 ```bash
 npm install
 npm run dev        # http://localhost:5173 (also reachable from your phone on the same network)
-npm test           # 154 tests
+npm test           # 156 tests
 npm run build      # typecheck + production build
 ```
 
@@ -57,7 +57,7 @@ The kart accelerates automatically. On a desktop the race screen shows the keybo
 ### Game modes
 - **Practice**: endless solo driving on the track you've selected, with item boxes and no countdown. Nothing is timed, recorded or unlocked, so it's the place to get used to the controls, the HUD and the items. **All three worlds are open in Practice** even if you haven't unlocked them for racing (switching back to Race or Time Trial drops you to your highest unlocked world).
 - **Race**: 3 laps against 5 bots (CyberBot-01, NeonViper, GlitchRider, ByteBlaze, ChromeFang, PulseNova pool), with item boxes. Finishing in the top 3 unlocks the next world.
-- **Time Trial**: solo, no bots or items, racing your own best-lap **ghost** for that kart. Its times go on the global **Time Trial** leaderboard (races have their own board).
+- **Time Trial**: solo, no bots or items, racing your own best-lap **ghost** for that kart (the ghost is Time Trial only; in a race it would look like a car restarting at the line every lap). Its times go on the global **Time Trial** leaderboard (races have their own board).
 - **Daily challenge**: one track per UTC day for everyone (the world rotates 1 → 2 → 3, the seed is derived from the date), played as a Time Trial. Because everyone gets the same seed, the leaderboard for that seed *is* the daily board. The menu card shows your best, the time until the reset, a ✅ once done and a 🔥 streak of consecutive days.
 
 
@@ -222,7 +222,7 @@ npm test             # vitest run
 npm run typecheck
 ```
 
-154 tests in `tests/` (they also run in CI):
+156 tests in `tests/` (they also run in CI):
 
 | File | Covers |
 |---|---|
