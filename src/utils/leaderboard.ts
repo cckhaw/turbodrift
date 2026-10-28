@@ -79,10 +79,10 @@ export function botScores(world: number, seed: number | null, mode: BoardMode, l
   });
 }
 
-/** Real rows plus however many bots it takes to reach BOARD_FILL, best lap first. */
+/** Real rows plus however many bots it takes to reach BOARD_FILL, fastest total race time first. */
 export function withBots(rows: ScoreEntry[], world: number, seed: number | null, mode: BoardMode, laps: number): ScoreEntry[] {
   const filler = botScores(world, seed, mode, laps, Math.max(0, BOARD_FILL - rows.length));
-  return [...rows, ...filler].sort((a, b) => a.lapMs - b.lapMs).slice(0, 25);
+  return [...rows, ...filler].sort((a, b) => a.totalMs - b.totalMs).slice(0, 25);
 }
 
 const clientId = (): string => {
@@ -222,8 +222,8 @@ export async function getBoard(world: number, seed: number | null, mode: BoardMo
     try {
       void flushPending();
       const rows = await fetchGlobal(world, seed, mode, laps);
-      // mark my own rows (the public view carries no client id): same name + same lap time as a local score
-      for (const r of rows) r.you = mine.some((m) => m.name === r.name && Math.round(m.lapMs) === r.lapMs);
+      // mark my own rows (the public view carries no client id): same name + same total time as a local score
+      for (const r of rows) r.you = mine.some((m) => m.name === r.name && Math.round(m.totalMs) === r.totalMs);
       return { rows: withBots(rows, world, seed, mode, laps), source: 'global' };
     } catch {
       /* fall through to the offline board */
