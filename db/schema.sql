@@ -16,6 +16,7 @@ create table if not exists scores (
 create unique index if not exists scores_client_track_mode_laps_idx on scores (client_id, world, seed, mode, laps);
 create index if not exists scores_board_idx on scores (world, seed, lap_ms);
 create index if not exists scores_world_idx on scores (world, lap_ms);
+create index if not exists scores_total_idx on scores (world, mode, laps, total_ms);
 
 -- cloud save (progress that follows a player via a secret sync code)
 create table if not exists saves (

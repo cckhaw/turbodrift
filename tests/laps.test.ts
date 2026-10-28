@@ -84,6 +84,14 @@ describe('laps per race', () => {
     expect((await getBoard(sql, '1', '5', 'trial', '4')).status).toBe(400);
   }, 60000);
 
+  it('ranks a board by total race time, not by best lap', async () => {
+    const B = '22222222-2222-4222-8222-222222222222';
+    // Quick has the better lap but the slower race; Steady is the other way round
+    await sql`insert into scores (client_id, name, world, seed, mode, laps, lap_ms, total_ms) values (${A}, 'Quick', 3, 9, 'race', 3, 40000, 130000), (${B}, 'Steady', 3, 9, 'race', 3, 42000, 126000)`;
+    const rows = (await getBoard(sql, '3', null, 'race', '3')).body as { name: string }[];
+    expect(rows.map((r) => r.name)).toEqual(['Steady', 'Quick']);
+  });
+
   it('a one-lap total is plausible (no phantom extra laps required)', async () => {
     expect(t1.totalMs).toBeGreaterThanOrEqual(t1.lapMs);
     expect(t1.lapMs).toBeGreaterThan(MIN_LAP_MS[1]);
@@ -127,7 +135,7 @@ describe('bots fill the boards', () => {
       expect(a.every((r) => r.bot && r.world === w.id)).toBe(true);
       expect(new Set(a.map((r) => r.name)).size).toBe(15); // no duplicate names on one board
       expect(a[0].lapMs).toBeGreaterThan(MIN_LAP_MS[w.id]); // slower than the physical floor, so a real player can top them
-      expect(a.map((r) => r.lapMs)).toEqual([...a.map((r) => r.lapMs)].sort((x, y) => x - y));
+      expect(a.map((r) => r.totalMs)).toEqual([...a.map((r) => r.totalMs)].sort((x, y) => x - y));
       // different boards get different rivals
       expect(botScores(w.id, 6, 'race', 3, 15)).not.toEqual(a);
       expect(botScores(w.id, 5, 'trial', 3, 15)).not.toEqual(a);
@@ -141,7 +149,7 @@ describe('bots fill the boards', () => {
     expect(rows[0].name).toBe('Ace');
     expect(rows.filter((r) => !r.bot)).toHaveLength(2);
     expect(rows.findIndex((r) => r.name === 'Mid')).toBeGreaterThan(0);
-    expect(rows.map((r) => r.lapMs)).toEqual([...rows.map((r) => r.lapMs)].sort((x, y) => x - y));
+    expect(rows.map((r) => r.totalMs)).toEqual([...rows.map((r) => r.totalMs)].sort((x, y) => x - y));
     // a full board of real times gets no bots
     const many = Array.from({ length: 20 }, (_, i) => ({ name: `P${i}`, lapMs: 40000 + i * 100, totalMs: 130000, world: 1, seed: 5 }));
     expect(withBots(many, 1, 5, 'trial', 3).every((r) => !r.bot)).toBe(true);

@@ -102,7 +102,7 @@ Waypoint following along a precomputed racing line (`track.ts`), look-ahead lane
 `?world=2&seed=98765` rebuilds the identical track on any device (mulberry32 PRNG, `src/utils/rng.ts`). The menu has a seed field, a dice button for a random seed and a copy-link button; the URL always reflects the selection. **Share Scorecard** copies an emoji race matrix (⬜ cars ahead, 🟦 you, ⬛ cars behind, one row per lap) with the lap times and a challenge link; on mobile it uses the native share sheet from the leaderboard modal. Time Trials share lap times instead.
 
 ### Leaderboard
-Board modal with a row of **world** tabs (look at any world without going back to the menu), a **Race / Trial** switch and a **1 / 2 / 3 lap** switch (it opens on the mode and lap count you're playing), plus two tabs for the world you're on: the current seed, and the best times across the world. Every lap count has its own board in every world. **Bots** fill empty places up to 15 rows (labelled BOT, generated on the device and never stored), so a new track always has rivals to chase and your real time slots in among them. Top 25 by best lap (one row per player per track), with your own rows highlighted and an editable name. It shows whether you are looking at the global board, or the offline fallback (your local times plus rival ghosts).
+Board modal with a row of **world** tabs (look at any world without going back to the menu), a **Race / Trial** switch and a **1 / 2 / 3 lap** switch (it opens on the mode and lap count you're playing), showing the best times across the world. Every lap count has its own board in every world. **Bots** fill empty places up to 15 rows (labelled BOT, generated on the device and never stored), so a new track always has rivals to chase and your real time slots in among them. Top 25 by total time for the whole race, over the lap count you picked (one row per player per track), with your own rows highlighted and an editable name. It shows whether you are looking at the global board, or the offline fallback (your local times plus rival ghosts).
 
 ### UI and presentation
 Apple-style glass interface: frosted panels (`rgba(255,255,255,0.08)` with a 28 px blur), 24 px squircle corners, the SF system font stack, Apple Blue `#007AFF` and neon pink `#FF2D55` on deep obsidian `#090D16`. Safe-area aware and thumb-first. Pseudo-3D road with hills, fog, particles, speed lines, spin-outs and screen shake.
@@ -214,7 +214,7 @@ All endpoints return JSON with `Cache-Control: no-store`; errors are `{ "error":
 
 | Method & path | Body / query | Success | Errors |
 |---|---|---|---|
-| `GET /api/leaderboard` | `?world=1..5`, optional `&seed=N`, `&mode=race\|trial` (default `trial`) and `&laps=1\|2\|3` (default 3) | `[{ name, lap_ms, total_ms, world, seed }]` (top 25) | 400 bad world/seed, 503 |
+| `GET /api/leaderboard` | `?world=1..5`, optional `&seed=N`, `&mode=race\|trial` (default `trial`) and `&laps=1\|2\|3` (default 3) | `[{ name, lap_ms, total_ms, world, seed }]` (top 25, fastest `total_ms` first) | 400 bad world/seed, 503 |
 | `POST /api/score` | `{ clientId, name, replay }` | `{ ok: true, lapMs, totalMs }` (the **server's** times) | 400 invalid or unverifiable replay, 429 slow down, 503 |
 | `POST /api/save` | `{ unlocked, medals, days, name, kart }` | `{ code, save }` | 400 bad save, 429 slow down, 503 |
 | `GET /api/save` | `?code=XXXX-XXXX-XXXX` (case and dashes forgiven) | `{ save }` | 400 bad code, 404 unknown code, 503 |

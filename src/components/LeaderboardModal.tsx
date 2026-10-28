@@ -113,14 +113,14 @@ export default function LeaderboardModal({ world, seed, last, mode, laps, onClos
                 {r.you ? `${r.name} ★` : r.name}
                 {r.bot && <span title="Bot score" className="ml-1.5 rounded-md bg-white/10 px-1 py-0.5 align-middle text-[10px] font-semibold text-white/50">BOT</span>}
               </span>
-              <span className="font-mono text-sm tabular-nums">{formatTime(r.lapMs)}</span>
+              <span className="font-mono text-sm tabular-nums">{formatTime(r.totalMs)}</span>
             </li>
           ))}
           {!board && <li className="py-8 text-center text-white/50">Loading…</li>}
           {board && rows.length === 0 && <li className="py-8 text-center text-white/50">No times yet. Be the first!</li>}
         </ol>
         <p className="px-5 pt-2 text-[11px] text-white/40">
-          {board?.source === 'global' && `Global board · server-verified ${kind === 'race' ? 'races' : 'time trials'} over ${bl} ${bl === 1 ? 'lap' : 'laps'}, best lap per player`}
+          {board?.source === 'global' && `Global board · server-verified ${kind === 'race' ? 'races' : 'time trials'} over ${bl} ${bl === 1 ? 'lap' : 'laps'}, total time, best per player`}
           {board?.source === 'offline' && 'Can’t reach the global board, so this shows your times'}
           {board?.source === 'local' && 'Local board: your times'}
           {board && ' · bots fill empty places'}

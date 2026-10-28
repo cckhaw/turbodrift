@@ -42,6 +42,7 @@ export function ensureSchema(sql: Sql): Promise<void> {
     await sql`create unique index if not exists scores_client_track_mode_laps_idx on scores (client_id, world, seed, mode, laps)`;
     await sql`create index if not exists scores_board_idx on scores (world, seed, lap_ms)`;
     await sql`create index if not exists scores_world_idx on scores (world, lap_ms)`;
+    await sql`create index if not exists scores_total_idx on scores (world, mode, laps, total_ms)`;
     await sql`create table if not exists saves (
       code        text        primary key,
       data        jsonb       not null,
@@ -113,6 +114,6 @@ export async function getBoard(sql: Sql, worldParam: string | null, seedParam: s
   await ensureSchema(sql);
   const rows = await sql`select name, lap_ms, total_ms, world, seed from scores
     where world = ${world} and mode = ${mode} and laps = ${laps} and (${seed}::int is null or seed = ${seed})
-    order by lap_ms asc limit 25`;
+    order by total_ms asc limit 25`;
   return { status: 200, body: rows };
 }
