@@ -20,23 +20,21 @@ interface Props {
 export default function LeaderboardModal({ world, seed, last, mode, laps, onClose }: Props) {
   // the board being viewed can be any world, so there is no trip back to the menu to look at another one
   const [bw, setBw] = useState(last?.world ?? world);
-  const [tab, setTab] = useState<'seed' | 'world'>('seed');
   const [kind, setKind] = useState<BoardMode>((last?.mode ?? mode) === 'race' ? 'race' : 'trial');
   const [bl, setBl] = useState<number>(last?.laps ?? laps ?? 3);
   const [board, setBoard] = useState<Board | null>(null);
   const [name, setName] = useState(getPlayerName());
   const [copied, setCopied] = useState(false);
   const w = WORLDS[bw - 1];
-  const seedBoard = bw === world && tab === 'seed'; // a seed only means something for the world you're on
 
   useEffect(() => {
     let live = true;
     setBoard(null);
-    getBoard(bw, seedBoard ? seed : null, kind, bl).then((b) => live && setBoard(b));
+    getBoard(bw, null, kind, bl).then((b) => live && setBoard(b));
     return () => {
       live = false;
     };
-  }, [bw, seed, seedBoard, kind, bl]);
+  }, [bw, kind, bl]);
 
   const share = async () => {
     const text = last && last.world === world && last.seed === seed ? scorecardText(last) : `🏁 Turbo Drift: Neon Circuit\n${WORLDS[world - 1].emoji} ${WORLDS[world - 1].name} · Seed ${seed}\nBeat my lap 👉 ${challengeUrl(world, seed)}`;
@@ -107,16 +105,6 @@ export default function LeaderboardModal({ world, seed, last, mode, laps, onClos
           />
         </div>
 
-        {bw === world && (
-          <div className="mx-5 flex rounded-pill bg-black/30 p-1 text-sm font-medium">
-            {(['seed', 'world'] as const).map((t) => (
-              <button key={t} onClick={() => setTab(t)} className={`flex-1 rounded-pill py-1.5 transition ${tab === t ? 'bg-apple-blue text-white' : 'text-white/60'}`}>
-                {t === 'seed' ? `Seed ${seed}` : 'World best'}
-              </button>
-            ))}
-          </div>
-        )}
-
         <ol className="mt-3 min-h-0 flex-1 space-y-1 overflow-y-auto px-3">
           {rows.map((r, i) => (
             <li key={i} className={`flex items-center gap-3 rounded-2xl px-3 py-2 ${r.you ? 'bg-apple-blue/25 ring-1 ring-apple-blue/60' : 'bg-white/[0.04]'}`}>
@@ -125,7 +113,6 @@ export default function LeaderboardModal({ world, seed, last, mode, laps, onClos
                 {r.you ? `${r.name} ★` : r.name}
                 {r.bot && <span title="Bot score" className="ml-1.5 rounded-md bg-white/10 px-1 py-0.5 align-middle text-[10px] font-semibold text-white/50">BOT</span>}
               </span>
-              {!seedBoard && <span className="font-mono text-[11px] text-white/35">#{r.seed}</span>}
               <span className="font-mono text-sm tabular-nums">{formatTime(r.lapMs)}</span>
             </li>
           ))}

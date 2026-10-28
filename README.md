@@ -58,7 +58,7 @@ The kart accelerates automatically. On a desktop the race screen shows the keybo
 - **Practice**: endless solo driving on the track you've selected, with item boxes and no countdown. Nothing is timed, recorded or unlocked, so it's the place to get used to the controls, the HUD and the items. **All three worlds are open in Practice** even if you haven't unlocked them for racing (switching back to Race or Time Trial drops you to your highest unlocked world).
 - **Race**: 1, 2 or 3 laps (pick on the menu or in Settings → Race) against 5 bots (CyberBot-01, NeonViper, GlitchRider, ByteBlaze, ChromeFang, PulseNova pool), with item boxes. Finishing in the top 3 unlocks the next world.
 - **Time Trial**: solo, no bots or items, with no opponents. If you switch on Settings → Race → *Best-lap ghost* you also see your fastest lap as a see-through car (off by default, because a lone car on the road reads as an opponent). Time Trial ghosts are never shown in races. Its times go on the global **Time Trial** leaderboard (races have their own board).
-- **Daily challenge**: one track per UTC day for everyone (the world rotates 1 → 2 → 3 → 4, the seed is derived from the date), played as a Time Trial. Because everyone gets the same seed, the leaderboard for that seed *is* the daily board. The menu card shows your best, the time until the reset, a ✅ once done and a 🔥 streak of consecutive days.
+- **Daily challenge**: one track per UTC day for everyone (the world rotates 1 → 2 → 3 → 4, the seed is derived from the date), played as a Time Trial. The menu card shows your best, the time until the reset, a ✅ once done and a 🔥 streak of consecutive days.
 
 
 ### Track map and road ahead
