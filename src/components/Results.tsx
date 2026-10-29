@@ -4,6 +4,8 @@ import { WORLDS } from '../game/worlds';
 import type { RaceResult } from '../game/types';
 import { formatTime, ordinal } from '../utils/format';
 import { copyText, scorecardText } from '../utils/share';
+import { hasChosenName } from '../utils/leaderboard';
+import NameField from './NameField';
 
 interface Props {
   result: RaceResult;
@@ -76,6 +78,11 @@ export default function Results({ result: r, newUnlock, onAgain, onMenu, onBoard
         {!trial && (
           <p className="mt-3 text-center text-xs text-white/45">Your best lap is posted to the Race leaderboard once the server has replayed your inputs to verify it.</p>
         )}
+
+        <div className="mt-3 rounded-2xl bg-white/[0.06] p-3">
+          <p className="mb-2 text-xs text-white/60">{hasChosenName() ? 'Leaderboard name' : 'Pick a name for the leaderboard (it shows as YOU until you do)'}</p>
+          <NameField />
+        </div>
 
         {newUnlock && (
           <p className="mt-3 rounded-2xl bg-apple-green/15 px-4 py-2.5 text-center text-sm font-medium text-apple-green">

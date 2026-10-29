@@ -102,6 +102,19 @@ export async function submitScore(sql: Sql, input: unknown, verify: Verifier): P
   return { status: 200, body: { ok: true, lapMs, totalMs } };
 }
 
+/** Rename every score a device has posted (the client id is the device's secret, as for submissions). */
+export async function renamePlayer(sql: Sql, input: unknown): Promise<Result> {
+  const b = (input && typeof input === 'object' ? input : {}) as Record<string, unknown>;
+  const { clientId } = b;
+  if (typeof clientId !== 'string' || !UUID.test(clientId)) return bad('bad client id');
+  // eslint-disable-next-line no-control-regex
+  const name = String(typeof b.name === 'string' ? b.name : '').replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 12);
+  if (!name) return bad('name needed');
+  await ensureSchema(sql);
+  await sql`update scores set name = ${name} where client_id = ${clientId}`;
+  return { status: 200, body: { ok: true, name } };
+}
+
 export async function getBoard(sql: Sql, worldParam: string | null, seedParam: string | null, modeParam: string | null = null, lapsParam: string | null = null): Promise<Result> {
   const mode = modeParam === 'race' ? 'race' : 'trial';
   const laps = lapsParam == null || lapsParam === '' ? 3 : Number(lapsParam);

@@ -48,6 +48,15 @@ export const setPlayerName = (n: string): void => {
   }
 };
 
+/** True once the player has typed a name of their own (until then scores go up as "YOU"). */
+export const hasChosenName = (): boolean => {
+  try {
+    return !!localStorage.getItem(NAME_KEY);
+  } catch {
+    return false;
+  }
+};
+
 function loadLocal(): ScoreEntry[] {
   try {
     return JSON.parse(localStorage.getItem(KEY) || '[]');
@@ -170,6 +179,7 @@ export function flushPending(): Promise<void> {
     // keep entries queued while we were sending
     const sent = new Set(queue.map((q) => q.id));
     writePending([...keep, ...readPending().filter((q) => !sent.has(q.id))]);
+    await flushRename();
   })();
   flushing = run;
   const release = () => {
@@ -177,6 +187,60 @@ export function flushPending(): Promise<void> {
   };
   run.then(release, release);
   return run;
+}
+
+const RENAME_KEY = 'turbodrift.rename.v1';
+
+/** Tell the server the new name (it renames every score from this device). Kept until it has been delivered. */
+async function flushRename(): Promise<void> {
+  let name: string | null = null;
+  try {
+    name = localStorage.getItem(RENAME_KEY);
+  } catch {
+    /* ignore */
+  }
+  if (!name || !globalEnabled()) return;
+  try {
+    await api('/api/rename', { method: 'POST', body: JSON.stringify({ clientId: clientId(), name }) });
+    localStorage.removeItem(RENAME_KEY);
+  } catch (err) {
+    if (!isRetryable(err)) {
+      try {
+        localStorage.removeItem(RENAME_KEY);
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+}
+
+/**
+ * Change the leaderboard name: the scores already posted, the ones still queued and the local records all take it, so
+ * the name can be fixed any time, not just before the first run.
+ */
+export async function renamePlayer(n: string): Promise<string> {
+  setPlayerName(n);
+  const name = getPlayerName();
+  const retag = () => {
+    try {
+      localStorage.setItem(KEY, JSON.stringify(loadLocal().map((s) => (s.you ? { ...s, name } : s))));
+    } catch {
+      /* ignore */
+    }
+    writePending(readPending().map((p) => ({ ...p, name })));
+  };
+  retag();
+  if (!globalEnabled()) return name;
+  try {
+    localStorage.setItem(RENAME_KEY, name);
+  } catch {
+    /* ignore */
+  }
+  // a score that is mid-flight still carries the old name, so let it land first and then rename everything
+  if (flushing) await flushing.catch(() => {});
+  retag();
+  await flushPending(); // sends anything still queued (now under the new name), then the rename itself
+  return name;
 }
 
 /** Retry when the browser comes back online. */
