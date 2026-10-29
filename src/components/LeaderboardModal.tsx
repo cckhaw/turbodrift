@@ -4,7 +4,8 @@ import { WORLDS } from '../game/worlds';
 import type { RaceResult } from '../game/types';
 import { formatTime } from '../utils/format';
 import Segmented from './Segmented';
-import { getBoard, getPlayerName, setPlayerName, type Board, type BoardMode } from '../utils/leaderboard';
+import { getBoard, type Board, type BoardMode } from '../utils/leaderboard';
+import NameField from './NameField';
 import { challengeUrl, copyText, scorecardText } from '../utils/share';
 
 interface Props {
@@ -23,7 +24,7 @@ export default function LeaderboardModal({ world, seed, last, mode, laps, onClos
   const [kind, setKind] = useState<BoardMode>((last?.mode ?? mode) === 'race' ? 'race' : 'trial');
   const [bl, setBl] = useState<number>(last?.laps ?? laps ?? 3);
   const [board, setBoard] = useState<Board | null>(null);
-  const [name, setName] = useState(getPlayerName());
+  const [tick, setTick] = useState(0); // bumped after a rename so the board is fetched again
   const [copied, setCopied] = useState(false);
   const w = WORLDS[bw - 1];
 
@@ -34,7 +35,7 @@ export default function LeaderboardModal({ world, seed, last, mode, laps, onClos
     return () => {
       live = false;
     };
-  }, [bw, kind, bl]);
+  }, [bw, kind, bl, tick]);
 
   const share = async () => {
     const text = last && last.world === world && last.seed === seed ? scorecardText(last) : `🏁 Turbo Drift: Neon Circuit\n${WORLDS[world - 1].emoji} ${WORLDS[world - 1].name} · Seed ${seed}\nBeat my lap 👉 ${challengeUrl(world, seed)}`;
@@ -128,16 +129,7 @@ export default function LeaderboardModal({ world, seed, last, mode, laps, onClos
         </p>
 
         <div className="flex items-center gap-2 p-4">
-          <input
-            aria-label="Your name"
-            maxLength={12}
-            value={name}
-            onChange={(e) => {
-              setName(e.target.value);
-              setPlayerName(e.target.value);
-            }}
-            className="w-28 rounded-pill border border-glass-border bg-black/30 px-4 py-3 text-sm outline-none focus:border-apple-blue"
-          />
+          <NameField className="w-44 shrink-0" onSaved={() => setTick((n) => n + 1)} />
           <button onClick={share} className="btn-hot flex flex-1 items-center justify-center gap-2 !py-3">
             {copied ? <Check size={18} /> : <Share2 size={18} />}
             {copied ? 'Copied!' : 'Share Scorecard'}

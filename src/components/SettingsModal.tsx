@@ -5,7 +5,7 @@ import { disableCloud, enableCloud, formatCode, getSyncCode, restoreFromCode } f
 import { globalEnabled } from '../utils/api';
 import { copyText } from '../utils/share';
 import { hapticsEnabled, hapticsSupported, setHaptics } from '../utils/haptics';
-import { getPlayerName, setPlayerName } from '../utils/leaderboard';
+import NameField from './NameField';
 import { resetProgress, type Progress } from '../utils/progress';
 import Segmented from './Segmented';
 import { currentPlatform, isStandalone } from '../utils/install';
@@ -58,7 +58,7 @@ const Section = ({ title, children }: { title: string; children: React.ReactNode
 
 export default function SettingsModal({ muted, onMute, onProgress, onClose, onTutorial, onHowTo, onPractice, onInstall, inRace }: Props) {
   const [s, setS] = useState<Settings>(loadSettings);
-  const [name, setName] = useState(getPlayerName());
+  const [nameKey, setNameKey] = useState(0); // remounts the name field after a restore brings in a saved name
   const [haptics, setHapticsState] = useState(hapticsEnabled());
   const [code, setCode] = useState<string | null>(getSyncCode());
   const [restore, setRestore] = useState('');
@@ -91,7 +91,7 @@ export default function SettingsModal({ muted, onMute, onProgress, onClose, onTu
     if (r.result === 'ok' && r.progress) {
       onProgress(r.progress);
       setCode(getSyncCode());
-      setName(getPlayerName());
+      setNameKey((n) => n + 1);
       setRestore('');
       setMsg('Progress restored.');
     } else setMsg(r.result === 'notfound' ? 'That code doesn’t match a save.' : 'Couldn’t reach the server. Try again when you’re online.');
@@ -214,16 +214,7 @@ export default function SettingsModal({ muted, onMute, onProgress, onClose, onTu
 
           <Section title="Profile">
             <Row label="Name" hint="Shown on the leaderboard">
-              <input
-                aria-label="Your name"
-                maxLength={12}
-                value={name}
-                onChange={(e) => {
-                  setName(e.target.value);
-                  setPlayerName(e.target.value);
-                }}
-                className="w-32 rounded-pill border border-glass-border bg-black/30 px-4 py-2 text-sm outline-none focus:border-apple-blue"
-              />
+              <NameField key={nameKey} className="w-60" />
             </Row>
           </Section>
 
