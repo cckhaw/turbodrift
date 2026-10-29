@@ -1,5 +1,6 @@
 /* Leaderboard logic, independent of the HTTP layer and of the Postgres driver (takes a tagged-template `sql`). */
 
+import { isCleanName } from '../src/utils/profanity.js';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Sql = (strings: TemplateStringsArray, ...values: unknown[]) => Promise<any[]>;
 
@@ -86,7 +87,7 @@ export async function submitScore(sql: Sql, input: unknown, verify: Verifier): P
   if (totalMs < lapMs + (laps - 1) * min || totalMs > MAX_TOTAL_MS) return bad('implausible race time');
   // eslint-disable-next-line no-control-regex
   let name = String(typeof b.name === 'string' ? b.name : '').replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 12);
-  if (!name) name = 'YOU';
+  if (!name || !isCleanName(name)) name = 'YOU'; // a run still counts under a name that isn't allowed, just not under that name
 
   await ensureSchema(sql);
   const recent = await sql`select 1 from scores where client_id = ${clientId} and updated_at > now() - make_interval(secs => ${THROTTLE_SECONDS}) limit 1`;
@@ -110,6 +111,7 @@ export async function renamePlayer(sql: Sql, input: unknown): Promise<Result> {
   // eslint-disable-next-line no-control-regex
   const name = String(typeof b.name === 'string' ? b.name : '').replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 12);
   if (!name) return bad('name needed');
+  if (!isCleanName(name)) return bad('that name isn’t allowed');
   await ensureSchema(sql);
   await sql`update scores set name = ${name} where client_id = ${clientId}`;
   return { status: 200, body: { ok: true, name } };

@@ -2,6 +2,7 @@ import type { Replay } from '../game/replay';
 import { WORLDS } from '../game/worlds';
 import { Rng, hashSeed } from './rng';
 import { api, globalEnabled } from './api';
+import { isCleanName } from './profanity';
 
 export interface ScoreEntry {
   name: string;
@@ -42,7 +43,8 @@ export const getPlayerName = (): string => {
 };
 export const setPlayerName = (n: string): void => {
   try {
-    localStorage.setItem(NAME_KEY, n.trim().slice(0, 12) || 'YOU');
+    const name = n.trim().slice(0, 12);
+    localStorage.setItem(NAME_KEY, name && isCleanName(name) ? name : 'YOU');
   } catch {
     /* ignore */
   }

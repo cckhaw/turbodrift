@@ -1,3 +1,4 @@
+import { isCleanName } from '../src/utils/profanity.js';
 /* Cloud save: progress that follows a player across devices via a secret sync code (no accounts). */
 import type { Result, Sql } from './_core.js';
 import { ensureSchema } from './_core.js';
@@ -46,7 +47,8 @@ export function parseSave(input: unknown): SaveData | null {
   if (!Array.isArray(days) || days.length > 90 || !days.every((d) => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d))) return null;
   if (typeof name !== 'string' || name.length > 12) return null;
   // eslint-disable-next-line no-control-regex
-  const cleanName = name.replace(/[\u0000-\u001f\u007f]/g, '').trim() || 'YOU';
+  const trimmed = name.replace(/[\u0000-\u001f\u007f]/g, '').trim();
+  const cleanName = trimmed && isCleanName(trimmed) ? trimmed : 'YOU';
   if (typeof kart !== 'string' || !KARTS.includes(kart)) return null;
   return { unlocked, medals: m, days: Array.from(new Set(days as string[])).sort(), name: cleanName, kart };
 }
